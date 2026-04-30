@@ -8,6 +8,17 @@ import re
 from pxr import Usd, UsdGeom, UsdShade
 
 from .base import ErrorType, TimeRange, _error, _prim_site, register_stage_validator
+from ._tokens import (
+    COLLISION_NOT_TRIANGULATED,
+    COMPLEX_AREA_LIGHT,
+    DATA_MAP_JPEG,
+    DOUBLE_SIDED_MESH,
+    FORBIDDEN_TEXTURE_FORMAT,
+    LEFT_HANDED_ORIENTATION,
+    MISSING_PREVIEW_SURFACE,
+    PROCEDURAL_SHADER,
+    UDIM_TEXTURE,
+)
 
 _UDIM_RE = re.compile(r"\.\d{4}\b|<UDIM>|<%d>|UDIM", re.IGNORECASE)
 _FORBIDDEN_EXTENSIONS = {".exr", ".tiff", ".tif", ".hdr"}
@@ -52,7 +63,7 @@ def _validate_material_portability(stage: Usd.Stage, timeRange: TimeRange) -> li
         pp = str(prim.GetPath())
         if not mat.GetSurfaceOutput():
             errors.append(_error(
-                "3.1.1", ErrorType.Warn, _prim_site(stage, pp),
+                MISSING_PREVIEW_SURFACE, ErrorType.Warn, _prim_site(stage, pp),
                 f"Material '{pp}' has no connected 'outputs:surface' terminal. "
                 "A UsdPreviewSurface wired to the universal surface output is required "
                 "for glTF conversion per REP §3.1.",
@@ -63,7 +74,7 @@ def _validate_material_portability(stage: Usd.Stage, timeRange: TimeRange) -> li
         sources, _ = mat.GetSurfaceOutput().GetConnectedSources()
         if not sources:
             errors.append(_error(
-                "3.1.1", ErrorType.Warn, _prim_site(stage, pp),
+                MISSING_PREVIEW_SURFACE, ErrorType.Warn, _prim_site(stage, pp),
                 f"Material '{pp}' 'outputs:surface' terminal has no connected shader. "
                 "A UsdPreviewSurface must be wired to the universal surface output per REP §3.1.",
                 "Wire a UsdPreviewSurface shader to 'outputs:surface' inside the material.",
@@ -76,7 +87,7 @@ def _validate_material_portability(stage: Usd.Stage, timeRange: TimeRange) -> li
             shader_id = shader.GetShaderId()
             if shader_id and "UsdPreviewSurface" not in shader_id:
                 errors.append(_error(
-                    "3.1.1", ErrorType.Warn, _prim_site(stage, pp),
+                    MISSING_PREVIEW_SURFACE, ErrorType.Warn, _prim_site(stage, pp),
                     f"Material '{pp}' surface output is connected to a '{shader_id}' shader, "
                     "not UsdPreviewSurface. Proprietary shaders must not replace the universal "
                     "surface output per REP §3.1.",
@@ -110,7 +121,7 @@ def _validate_texture_format(stage: Usd.Stage, timeRange: TimeRange) -> list:
         pp = str(prim.GetPath())
         if _UDIM_RE.search(path_str):
             errors.append(_error(
-                "3.1.2", ErrorType.Error, _prim_site(stage, pp),
+                UDIM_TEXTURE, ErrorType.Error, _prim_site(stage, pp),
                 f"Texture path '{path_str}' on '{pp}' contains a UDIM tile pattern. "
                 "Multi-tile UV mapping (UDIMs) is unsupported by glTF 2.0 and many real-time "
                 "engines; must not be used per REP §3.1.",
@@ -123,7 +134,7 @@ def _validate_texture_format(stage: Usd.Stage, timeRange: TimeRange) -> list:
             if ext == ".hdr" and _is_dome_light_texture(prim):
                 continue
             errors.append(_error(
-                "3.2.1", ErrorType.Error, _prim_site(stage, pp),
+                FORBIDDEN_TEXTURE_FORMAT, ErrorType.Error, _prim_site(stage, pp),
                 f"Texture '{path_str}' on '{pp}' uses forbidden format '{ext}'. "
                 "EXR, TIFF, and other HDR/DCC formats must not be used for surface maps "
                 "in distributed assets per REP §3.2. "
@@ -133,7 +144,7 @@ def _validate_texture_format(stage: Usd.Stage, timeRange: TimeRange) -> list:
             ))
         if ext in _DATA_MAP_JPEG_EXTENSIONS and any(h in path_str.lower() for h in _DATA_MAP_HINTS):
             errors.append(_error(
-                "3.2.2", ErrorType.Error, _prim_site(stage, pp),
+                DATA_MAP_JPEG, ErrorType.Error, _prim_site(stage, pp),
                 f"Data map texture '{path_str}' on '{pp}' uses JPEG. "
                 "Normal/metallic/roughness/ORM maps must use lossless PNG per REP §3.2.",
                 "Convert the data map to PNG.",
@@ -155,7 +166,7 @@ def _validate_geometry_constraints(stage: Usd.Stage, timeRange: TimeRange) -> li
             orientation = orientation_attr.Get()
             if orientation is not None and str(orientation) == "leftHanded":
                 errors.append(_error(
-                    "3.4.2", ErrorType.Warn, _prim_site(stage, pp),
+                    LEFT_HANDED_ORIENTATION, ErrorType.Warn, _prim_site(stage, pp),
                     f"Mesh '{pp}' uses orientation='leftHanded'. "
                     "Meshes must use 'rightHanded' (CCW winding) to align with glTF 2.0 per REP §3.4.",
                     "Remove the orientation attribute (rightHanded is the OpenUSD default) "
@@ -164,7 +175,7 @@ def _validate_geometry_constraints(stage: Usd.Stage, timeRange: TimeRange) -> li
         ds_attr = mesh.GetDoubleSidedAttr()
         if ds_attr.IsValid() and ds_attr.Get():
             errors.append(_error(
-                "3.4.3", ErrorType.Warn, _prim_site(stage, pp),
+                DOUBLE_SIDED_MESH, ErrorType.Warn, _prim_site(stage, pp),
                 f"Mesh '{pp}' has doubleSided=true. Assets must not rely on doubleSided to "
                 "mask incorrect winding per REP §3.4. Fix the underlying face orientation instead.",
                 "Correct the vertex winding order in your DCC tool and set doubleSided=false.",
@@ -177,7 +188,7 @@ def _validate_geometry_constraints(stage: Usd.Stage, timeRange: TimeRange) -> li
                     non_tri = [c for c in counts if c != 3]
                     if non_tri:
                         errors.append(_error(
-                            "3.4.1", ErrorType.Error, _prim_site(stage, pp),
+                            COLLISION_NOT_TRIANGULATED, ErrorType.Error, _prim_site(stage, pp),
                             f"Collision mesh '{pp}' contains {len(non_tri)} non-triangular "
                             f"face(s) (e.g. polygon with {non_tri[0]} vertices). "
                             "Collision meshes must be explicitly triangulated per REP §3.4.",
@@ -198,7 +209,7 @@ def _validate_texture_baking(stage: Usd.Stage, timeRange: TimeRange) -> list:
         shader_id = (shader.GetShaderId() or "").lower()
         if any(hint in shader_id for hint in _PROCEDURAL_NODE_HINTS):
             errors.append(_error(
-                "3.3.1", ErrorType.Warn, _site(stage, prim),
+                PROCEDURAL_SHADER, ErrorType.Warn, _site(stage, prim),
                 f"Shader '{prim.GetPath()}' uses procedural node '{shader.GetShaderId()}'. "
                 "Procedural texture graphs are not interoperable and should be baked "
                 "to image-backed textures or mesh primvars per REP §3.3.",
@@ -214,7 +225,7 @@ def _validate_lighting_portability(stage: Usd.Stage, timeRange: TimeRange) -> li
         if prim.GetTypeName() not in ("RectLight", "CylinderLight"):
             continue
         errors.append(_error(
-            "3.6.1", ErrorType.Warn, _site(stage, prim),
+            COMPLEX_AREA_LIGHT, ErrorType.Warn, _site(stage, prim),
             f"Light '{prim.GetPath()}' is type '{prim.GetTypeName()}'. "
             "Complex area lights are not universally supported and should be "
             "avoided for interoperable assets per REP §3.6.",

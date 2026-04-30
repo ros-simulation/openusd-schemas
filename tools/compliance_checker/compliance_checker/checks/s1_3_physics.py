@@ -7,6 +7,16 @@ from collections import defaultdict
 from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
 from .base import ErrorType, TimeRange, _error, _prim_site, _stage_site, register_stage_validator
+from ._tokens import (
+    COLLISION_GEOMETRY_AUTHORING,
+    COLLISION_MISSING_MATERIAL,
+    INSTANCEABLE_PHYSICS,
+    MIMIC_JOINT_CONSTRAINT,
+    MIMIC_JOINT_DEPRECATED,
+    MISSING_JOINT_LIMITS,
+    MULTIPLE_ARTICULATION_ROOTS,
+    NON_POSITIVE_MASS,
+)
 
 
 def _applied(prim: Usd.Prim) -> set[str]:
@@ -28,14 +38,14 @@ def _check_joint_limits(stage: Usd.Stage, timeRange: TimeRange) -> list:
         upper = prim.GetAttribute("physics:upperLimit")
         if not lower.IsAuthored():
             errors.append(_error(
-                "1.3.1", ErrorType.Error, _prim_site(stage, pp),
+                MISSING_JOINT_LIMITS, ErrorType.Error, _prim_site(stage, pp),
                 f"Joint '{pp}' ({type_name}) is missing 'physics:lowerLimit'. "
                 "Non-continuous joints must author explicit limits per REP §1.3.",
                 "Author `float physics:lowerLimit = <value>` on this joint prim.",
             ))
         if not upper.IsAuthored():
             errors.append(_error(
-                "1.3.1", ErrorType.Error, _prim_site(stage, pp),
+                MISSING_JOINT_LIMITS, ErrorType.Error, _prim_site(stage, pp),
                 f"Joint '{pp}' ({type_name}) is missing 'physics:upperLimit'. "
                 "Non-continuous joints must author explicit limits per REP §1.3.",
                 "Author `float physics:upperLimit = <value>` on this joint prim.",
@@ -56,7 +66,7 @@ def _check_articulation_root(stage: Usd.Stage, timeRange: TimeRange) -> list:
         return []
     paths = ", ".join(str(p.GetPath()) for p in roots)
     return [_error(
-        "1.3.2", ErrorType.Warn, _stage_site(stage),
+        MULTIPLE_ARTICULATION_ROOTS, ErrorType.Warn, _stage_site(stage),
         f"Stage contains {len(roots)} ArticulationRootAPI prims: [{paths}]. "
         "There must be at most one per connected kinematic tree per REP §1.3. "
         "Multiple roots in the same tree will fracture reduced-coordinate solvers.",
@@ -85,7 +95,7 @@ def _check_mass_properties(stage: Usd.Stage, timeRange: TimeRange) -> list:
         if mass is not None and mass <= 0.0:
             pp = str(prim.GetPath())
             errors.append(_error(
-                "1.3.3", ErrorType.Warn, _prim_site(stage, pp),
+                NON_POSITIVE_MASS, ErrorType.Warn, _prim_site(stage, pp),
                 f"Prim '{pp}' has PhysicsRigidBodyAPI with non-positive "
                 f"physics:mass = {mass}. Dynamic bodies must define strictly positive "
                 "mass per REP §1.3.",
@@ -121,7 +131,7 @@ def _check_collision_material(stage: Usd.Stage, timeRange: TimeRange) -> list:
         direct = binding_api.GetDirectBinding("physics")
         if not direct.GetMaterialPath():
             errors.append(_error(
-                "1.3.5", ErrorType.Warn, _prim_site(stage, pp),
+                COLLISION_MISSING_MATERIAL, ErrorType.Warn, _prim_site(stage, pp),
                 f"Collision geometry '{pp}' has no physics material binding "
                 "(material:binding:physics). Deterministic contact dynamics require a "
                 "UsdPhysicsMaterialAPI material bound with the physics purpose per REP §1.3.4.",
@@ -136,7 +146,7 @@ def _check_collision_material(stage: Usd.Stage, timeRange: TimeRange) -> list:
         for attr_name in _CM_REQUIRED_ATTRS:
             if not mat_prim.GetAttribute(attr_name).IsAuthored():
                 errors.append(_error(
-                    "1.3.5", ErrorType.Warn, _prim_site(stage, str(mat_path)),
+                    COLLISION_MISSING_MATERIAL, ErrorType.Warn, _prim_site(stage, str(mat_path)),
                     f"Physics material '{mat_path}' bound to '{pp}' is missing "
                     f"'{attr_name}'. All three contact physics attributes must be defined "
                     "per REP §1.3.4.",
@@ -164,7 +174,7 @@ def _check_collision_geometry_authoring(stage: Usd.Stage, timeRange: TimeRange) 
             purpose = purpose_attr.Get() if purpose_attr.IsValid() else None
             if purpose != UsdGeom.Tokens.guide:
                 errors.append(_error(
-                    "1.3.4", ErrorType.Warn, _prim_site(stage, pp),
+                    COLLISION_GEOMETRY_AUTHORING, ErrorType.Warn, _prim_site(stage, pp),
                     f"Collision geometry '{pp}' has purpose={purpose!r}. "
                     "Collision geometry should explicitly set purpose='guide' per REP §1.3.1.",
                     "Author `token purpose = 'guide'` on collision geometry prims.",
@@ -173,7 +183,7 @@ def _check_collision_geometry_authoring(stage: Usd.Stage, timeRange: TimeRange) 
         approx = approx_attr.Get() if approx_attr and approx_attr.IsValid() else None
         if approx != "none":
             errors.append(_error(
-                "1.3.4", ErrorType.Warn, _prim_site(stage, pp),
+                COLLISION_GEOMETRY_AUTHORING, ErrorType.Warn, _prim_site(stage, pp),
                 f"Collision geometry '{pp}' has physics:approximation={approx!r}. "
                 "Collision geometry should explicitly set "
                 "physics:approximation='none' per REP §1.3.1.",
@@ -201,7 +211,7 @@ def _check_mimic_cycle_free(graph: dict[str, list[str]], stage: Usd.Stage) -> li
         if node in visiting:
             cycle = stack[stack.index(node):] + [node]
             errors.append(_error(
-                "1.3.7", ErrorType.Error, _prim_site(stage, node),
+                MIMIC_JOINT_CONSTRAINT, ErrorType.Error, _prim_site(stage, node),
                 "MimicJointAPI relationships must form a DAG. "
                 f"Detected cycle: {' -> '.join(cycle)}.",
                 "Break the mimic cycle by removing one coupling edge.",
@@ -230,7 +240,7 @@ def _check_mimic_joint(stage: Usd.Stage, timeRange: TimeRange) -> list:
             continue
         pp = str(prim.GetPath())
         errors.append(_error(
-            "1.3.9", ErrorType.Warn, _prim_site(stage, pp),
+            MIMIC_JOINT_DEPRECATED, ErrorType.Warn, _prim_site(stage, pp),
             f"Prim '{pp}' uses deprecated 'MimicJointAPI'. "
             "REP §1.3 now requires 'ExtendedPhysicsMimicAPI' (ext_physics:mimic:*) "
             "for mimic joint coupling. MimicJointAPI has been removed from the spec.",
@@ -242,7 +252,7 @@ def _check_mimic_joint(stage: Usd.Stage, timeRange: TimeRange) -> list:
         type_name = prim.GetTypeName()
         if type_name not in _MIMIC_ALLOWED_TYPES:
             errors.append(_error(
-                "1.3.7", ErrorType.Warn, _prim_site(stage, pp),
+                MIMIC_JOINT_CONSTRAINT, ErrorType.Warn, _prim_site(stage, pp),
                 f"MimicJointAPI is applied to '{pp}' (type: '{type_name}'). "
                 "MimicJointAPI must only be applied to PhysicsRevoluteJoint or "
                 "PhysicsPrismaticJoint per REP §1.3.",
@@ -253,7 +263,7 @@ def _check_mimic_joint(stage: Usd.Stage, timeRange: TimeRange) -> list:
         rel = prim.GetRelationship("mimic:joint")
         if not rel.IsValid():
             errors.append(_error(
-                "1.3.7", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_JOINT_CONSTRAINT, ErrorType.Error, _prim_site(stage, pp),
                 f"MimicJointAPI on '{pp}' is missing required relationship 'mimic:joint'.",
                 "Author `rel mimic:joint = </path/to/source_joint>` targeting the "
                 "source revolute/prismatic joint.",
@@ -262,7 +272,7 @@ def _check_mimic_joint(stage: Usd.Stage, timeRange: TimeRange) -> list:
         targets = rel.GetTargets()
         if len(targets) != 1:
             errors.append(_error(
-                "1.3.7", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_JOINT_CONSTRAINT, ErrorType.Error, _prim_site(stage, pp),
                 f"'mimic:joint' on '{pp}' must target exactly one source joint; "
                 f"found {len(targets)} targets.",
                 "Keep exactly one relationship target.",
@@ -272,7 +282,7 @@ def _check_mimic_joint(stage: Usd.Stage, timeRange: TimeRange) -> list:
         source = stage.GetPrimAtPath(target)
         if not source or not source.IsValid():
             errors.append(_error(
-                "1.3.7", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_JOINT_CONSTRAINT, ErrorType.Error, _prim_site(stage, pp),
                 f"'mimic:joint' on '{pp}' targets '{target}', which does not "
                 "exist in the composed stage.",
                 "Point to an existing revolute/prismatic joint prim.",
@@ -280,7 +290,7 @@ def _check_mimic_joint(stage: Usd.Stage, timeRange: TimeRange) -> list:
             continue
         if source.GetTypeName() not in _MIMIC_ALLOWED_TYPES:
             errors.append(_error(
-                "1.3.7", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_JOINT_CONSTRAINT, ErrorType.Error, _prim_site(stage, pp),
                 f"'mimic:joint' on '{pp}' targets '{target}' "
                 f"(type '{source.GetTypeName()}'). Source joint must be revolute or prismatic.",
                 "Target a PhysicsRevoluteJoint or PhysicsPrismaticJoint.",
@@ -321,7 +331,7 @@ def _check_instanceable_physics(stage: Usd.Stage, timeRange: TimeRange) -> list:
             reason = (f"applied schemas: {forbidden_apis}" if forbidden_apis
                       else f"type: {prim.GetTypeName()}")
             errors.append(_error(
-                "1.3.8", ErrorType.Error, _prim_site(stage, pp),
+                INSTANCEABLE_PHYSICS, ErrorType.Error, _prim_site(stage, pp),
                 f"Prim '{pp}' has instanceable=true but carries physics "
                 f"or ROS schemas ({reason}). Instance proxies obscure child prims from "
                 "relationship targeting, breaking joints and ROS interfaces per REP §3.5.",

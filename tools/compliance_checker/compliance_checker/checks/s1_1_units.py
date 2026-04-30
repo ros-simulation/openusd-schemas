@@ -5,6 +5,15 @@ from __future__ import annotations
 from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
 from .base import ErrorType, TimeRange, _error, _prim_site, _stage_site, register_stage_validator
+from ._tokens import (
+    KINEMATIC_NON_IDENTITY_SCALE,
+    KINEMATIC_TRANSFORM_OPS,
+    ROOT_HAS_ROTATION,
+    WRONG_KILOGRAMS_PER_UNIT,
+    WRONG_METERS_PER_UNIT,
+    WRONG_TIME_CODES_PER_SECOND,
+    WRONG_UP_AXIS,
+)
 
 _ROTATE_OP_KEYWORDS = ("rotate", "orient")
 _JOINT_TYPES = {
@@ -29,7 +38,7 @@ def _check_meters_per_unit(stage):
     value = UsdGeom.GetStageMetersPerUnit(stage)
     if value != 1.0:
         return [_error(
-            "1.1.1", ErrorType.Error, _stage_site(stage),
+            WRONG_METERS_PER_UNIT, ErrorType.Error, _stage_site(stage),
             f"metersPerUnit is {value!r}; must be 1.0 (meters) per REP §1.1. "
             "All linear dimensions must be expressed in meters.",
             "Call UsdGeom.SetStageMetersPerUnit(stage, 1.0) on the root layer.",
@@ -41,7 +50,7 @@ def _check_kilograms_per_unit(stage):
     value = stage.GetMetadata("kilogramsPerUnit")
     if value is not None and value != 1.0:
         return [_error(
-            "1.1.2", ErrorType.Error, _stage_site(stage),
+            WRONG_KILOGRAMS_PER_UNIT, ErrorType.Error, _stage_site(stage),
             f"kilogramsPerUnit is {value!r}; must be 1.0 per REP §1.1. "
             "All mass values must be expressed in kilograms.",
             "Author `kilogramsPerUnit = 1` in the root layer metadata block.",
@@ -53,7 +62,7 @@ def _check_up_axis(stage):
     up_axis = UsdGeom.GetStageUpAxis(stage)
     if up_axis != UsdGeom.Tokens.z:
         return [_error(
-            "1.1.3", ErrorType.Error, _stage_site(stage),
+            WRONG_UP_AXIS, ErrorType.Error, _stage_site(stage),
             f"upAxis is {up_axis!r}; must be 'Z' (Z-up, X-forward, Y-left) per REP §1.1 "
             "and REP 103.",
             "Call UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z).",
@@ -65,7 +74,7 @@ def _check_time_codes_per_second(stage):
     value = stage.GetTimeCodesPerSecond()
     if value != 1.0:
         return [_error(
-            "1.1.5", ErrorType.Error, _stage_site(stage),
+            WRONG_TIME_CODES_PER_SECOND, ErrorType.Error, _stage_site(stage),
             f"timeCodesPerSecond is {value!r}; must be 1.0 per REP §1.1. "
             "One USD time code must equal one second for interoperable assets.",
             "Author `timeCodesPerSecond = 1` in the root layer metadata block.",
@@ -86,7 +95,7 @@ def _check_root_rotation(stage):
         op_name = op.GetOpName()
         if any(k in op_name.lower() for k in _ROTATE_OP_KEYWORDS):
             errors.append(_error(
-                "1.1.4", ErrorType.Warn, _prim_site(stage, pp),
+                ROOT_HAS_ROTATION, ErrorType.Warn, _prim_site(stage, pp),
                 f"Root prim has rotation xformOp '{op_name}'. "
                 "Geometry must not rely on root-node rotations to align to Z-up; "
                 "points/normals should be baked at source level.",
@@ -116,7 +125,7 @@ def _check_kinematic_transform_ops(stage):
         if has_matrix or has_euler or has_translate != 1 or has_orient != 1 or len(ops) != 2:
             pp = str(prim.GetPath())
             errors.append(_error(
-                "1.1.6", ErrorType.Error, _prim_site(stage, pp),
+                KINEMATIC_TRANSFORM_OPS, ErrorType.Error, _prim_site(stage, pp),
                 f"Kinematic prim '{pp}' must use a minimal transform stack: "
                 f"exactly one xformOp:translate and one xformOp:orient. Found xformOpOrder={op_names!r}.",
                 "Replace matrix/Euler ops with a translate+orient pair and keep only those "
@@ -140,7 +149,7 @@ def _check_kinematic_scale(stage):
             if value is not None and not _is_identity_scale(value):
                 pp = str(prim.GetPath())
                 errors.append(_error(
-                    "1.1.7", ErrorType.Error, _prim_site(stage, pp),
+                    KINEMATIC_NON_IDENTITY_SCALE, ErrorType.Error, _prim_site(stage, pp),
                     f"Kinematic prim '{pp}' has non-identity scale {value!r}. "
                     "Non-identity scale on rigid bodies and joints is prohibited per REP §1.1.",
                     "Remove scale from the kinematic prim, or push geometric scaling "

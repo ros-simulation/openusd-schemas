@@ -8,6 +8,14 @@ Check IDs covered:
   4.2.5  ExtendedPhysicsPositionBasedClampingAPI lookup table must be valid
 """
 
+from compliance_checker.checks._tokens import (
+    ACTUATOR_INVALID_TARGETS,
+    CLAMPING_LOOKUP_TABLE,
+    MIMIC_CYCLE,
+    MIMIC_INVALID_RELATIONSHIP,
+    MIMIC_WRONG_JOINT_TYPE,
+)
+
 from .conftest import has, make_stage, none_with, run_validators
 
 # ------------------------------------------------------------------ #
@@ -23,7 +31,7 @@ def PhysicsFixedJoint "fixed" (
     prepend apiSchemas = ["ExtendedPhysicsMimicAPI"]
 ) {}
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), "4.2.1")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), MIMIC_WRONG_JOINT_TYPE)
 
     def test_mimic_on_revolute_with_valid_rel_no_violation(self):
         stage = make_stage("""
@@ -41,9 +49,9 @@ def PhysicsRevoluteJoint "follower" (
 }
 """)
         v = run_validators(stage, "rep0158:ExtendedPhysicsMimic")
-        assert none_with(v, "4.2.1")
-        assert none_with(v, "4.2.2")
-        assert none_with(v, "4.2.3")
+        assert none_with(v, MIMIC_WRONG_JOINT_TYPE)
+        assert none_with(v, MIMIC_INVALID_RELATIONSHIP)
+        assert none_with(v, MIMIC_CYCLE)
 
     def test_mimic_on_prismatic_with_valid_rel_no_violation(self):
         stage = make_stage("""
@@ -61,8 +69,8 @@ def PhysicsPrismaticJoint "slide" (
 }
 """)
         v = run_validators(stage, "rep0158:ExtendedPhysicsMimic")
-        assert none_with(v, "4.2.1")
-        assert none_with(v, "4.2.2")
+        assert none_with(v, MIMIC_WRONG_JOINT_TYPE)
+        assert none_with(v, MIMIC_INVALID_RELATIONSHIP)
 
     def test_mimic_missing_relationship_gives_error(self):
         stage = make_stage("""
@@ -74,7 +82,7 @@ def PhysicsRevoluteJoint "follower" (
     float physics:upperLimit = 1.0
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), "4.2.2")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), MIMIC_INVALID_RELATIONSHIP)
 
     def test_mimic_relationship_targeting_nonexistent_prim_gives_error(self):
         stage = make_stage("""
@@ -85,7 +93,7 @@ def PhysicsRevoluteJoint "follower" (
     rel ext_physics:mimic:joint = </nonexistent>
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), "4.2.2")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), MIMIC_INVALID_RELATIONSHIP)
 
     def test_mimic_targeting_non_joint_gives_error(self):
         stage = make_stage("""
@@ -97,7 +105,7 @@ def PhysicsRevoluteJoint "follower" (
     rel ext_physics:mimic:joint = </notajoint>
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), "4.2.2")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), MIMIC_INVALID_RELATIONSHIP)
 
     def test_mimic_cycle_gives_error(self):
         stage = make_stage("""
@@ -117,7 +125,7 @@ def PhysicsRevoluteJoint "joint_b" (
     rel ext_physics:mimic:joint = </joint_a>
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), "4.2.3")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsMimic"), MIMIC_CYCLE)
 
     def test_mimic_chain_no_cycle_no_violation(self):
         stage = make_stage("""
@@ -142,7 +150,7 @@ def PhysicsRevoluteJoint "leaf" (
 }
 """)
         v = run_validators(stage, "rep0158:ExtendedPhysicsMimic")
-        assert none_with(v, "4.2.3")
+        assert none_with(v, MIMIC_CYCLE)
 
 
 # ------------------------------------------------------------------ #
@@ -158,7 +166,7 @@ def Xform "actuator" (
     prepend apiSchemas = ["ExtendedPhysicsActuatorAPI"]
 ) {}
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), "4.2.4")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), ACTUATOR_INVALID_TARGETS)
 
     def test_actuator_targeting_revolute_no_violation(self):
         stage = make_stage("""
@@ -173,7 +181,7 @@ def Xform "actuator" (
     rel ext_physics:actuator:targets = </elbow>
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), "4.2.4")
+        assert none_with(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), ACTUATOR_INVALID_TARGETS)
 
     def test_actuator_targeting_prismatic_no_violation(self):
         stage = make_stage("""
@@ -188,7 +196,7 @@ def Xform "actuator" (
     rel ext_physics:actuator:targets = </slide>
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), "4.2.4")
+        assert none_with(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), ACTUATOR_INVALID_TARGETS)
 
     def test_actuator_targeting_nonexistent_prim_gives_error(self):
         stage = make_stage("""
@@ -199,7 +207,7 @@ def Xform "actuator" (
     rel ext_physics:actuator:targets = </ghost>
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), "4.2.4")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), ACTUATOR_INVALID_TARGETS)
 
     def test_actuator_targeting_fixed_joint_gives_error(self):
         stage = make_stage("""
@@ -211,7 +219,7 @@ def Xform "actuator" (
     rel ext_physics:actuator:targets = </base>
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), "4.2.4")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), ACTUATOR_INVALID_TARGETS)
 
     def test_actuator_targeting_xform_gives_error(self):
         stage = make_stage("""
@@ -223,7 +231,7 @@ def Xform "actuator" (
     rel ext_physics:actuator:targets = </link>
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), "4.2.4")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsActuator"), ACTUATOR_INVALID_TARGETS)
 
 
 # ------------------------------------------------------------------ #
@@ -243,7 +251,7 @@ def Xform "clamp" (
 }
 """)
         assert none_with(
-            run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), "4.2.5"
+            run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), CLAMPING_LOOKUP_TABLE
         )
 
     def test_mismatched_lengths_gives_error(self):
@@ -256,7 +264,7 @@ def Xform "clamp" (
     float[] ext_physics:clamp_position:lookupEfforts = [10.0, 20.0]
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), "4.2.5")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), CLAMPING_LOOKUP_TABLE)
 
     def test_non_monotonic_positions_gives_error(self):
         stage = make_stage("""
@@ -268,7 +276,7 @@ def Xform "clamp" (
     float[] ext_physics:clamp_position:lookupEfforts = [10.0, 20.0, 15.0]
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), "4.2.5")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), CLAMPING_LOOKUP_TABLE)
 
     def test_duplicate_position_values_gives_error(self):
         stage = make_stage("""
@@ -280,7 +288,7 @@ def Xform "clamp" (
     float[] ext_physics:clamp_position:lookupEfforts = [10.0, 10.0, 5.0]
 }
 """)
-        assert has(run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), "4.2.5")
+        assert has(run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), CLAMPING_LOOKUP_TABLE)
 
     def test_empty_arrays_no_violation(self):
         stage = make_stage("""
@@ -290,7 +298,7 @@ def Xform "clamp" (
 ) {}
 """)
         assert none_with(
-            run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), "4.2.5"
+            run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), CLAMPING_LOOKUP_TABLE
         )
 
     def test_single_entry_no_violation(self):
@@ -304,5 +312,5 @@ def Xform "clamp" (
 }
 """)
         assert none_with(
-            run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), "4.2.5"
+            run_validators(stage, "rep0158:ExtendedPhysicsPositionClamping"), CLAMPING_LOOKUP_TABLE
         )

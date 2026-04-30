@@ -10,6 +10,16 @@ Check IDs covered:
   1.1.7  kinematic prim scale must be identity if authored
 """
 
+from compliance_checker.checks._tokens import (
+    KINEMATIC_NON_IDENTITY_SCALE,
+    KINEMATIC_TRANSFORM_OPS,
+    ROOT_HAS_ROTATION,
+    WRONG_KILOGRAMS_PER_UNIT,
+    WRONG_METERS_PER_UNIT,
+    WRONG_TIME_CODES_PER_SECOND,
+    WRONG_UP_AXIS,
+)
+
 from .conftest import has, make_stage, none_with, run_validators
 
 _V = "rep0158:CoordinateSystem"
@@ -23,7 +33,7 @@ class TestMetersPerUnit:
     def test_missing_gives_error(self):
         """Default metersPerUnit is 0.01 (centimetres) – must report 1.1.1."""
         stage = make_stage('#usda 1.0\ndef Xform "Root" {}')
-        assert has(run_validators(stage, _V), "1.1.1")
+        assert has(run_validators(stage, _V), WRONG_METERS_PER_UNIT)
 
     def test_wrong_value_gives_error(self):
         stage = make_stage("""
@@ -33,7 +43,7 @@ class TestMetersPerUnit:
 )
 def Xform "Root" {}
 """)
-        assert has(run_validators(stage, _V), "1.1.1")
+        assert has(run_validators(stage, _V), WRONG_METERS_PER_UNIT)
 
     def test_correct_value_no_violation(self):
         stage = make_stage("""
@@ -43,7 +53,7 @@ def Xform "Root" {}
 )
 def Xform "Root" {}
 """)
-        assert none_with(run_validators(stage, _V), "1.1.1")
+        assert none_with(run_validators(stage, _V), WRONG_METERS_PER_UNIT)
 
 
 # ------------------------------------------------------------------ #
@@ -61,7 +71,7 @@ class TestKilogramsPerUnit:
 )
 def Xform "Root" {}
 """)
-        assert has(run_validators(stage, _V), "1.1.2")
+        assert has(run_validators(stage, _V), WRONG_KILOGRAMS_PER_UNIT)
 
     def test_wrong_value_gives_error(self):
         stage = make_stage("""
@@ -71,7 +81,7 @@ def Xform "Root" {}
 )
 def Xform "Root" {}
 """)
-        assert has(run_validators(stage, _V), "1.1.2")
+        assert has(run_validators(stage, _V), WRONG_KILOGRAMS_PER_UNIT)
 
     def test_correct_value_no_violation(self):
         stage = make_stage("""
@@ -81,7 +91,7 @@ def Xform "Root" {}
 )
 def Xform "Root" {}
 """)
-        assert none_with(run_validators(stage, _V), "1.1.2")
+        assert none_with(run_validators(stage, _V), WRONG_KILOGRAMS_PER_UNIT)
 
 
 # ------------------------------------------------------------------ #
@@ -93,7 +103,7 @@ class TestUpAxis:
     def test_default_y_up_gives_error(self):
         """OpenUSD default is Y-up; must report 1.1.3."""
         stage = make_stage('#usda 1.0\ndef Xform "Root" {}')
-        assert has(run_validators(stage, _V), "1.1.3")
+        assert has(run_validators(stage, _V), WRONG_UP_AXIS)
 
     def test_explicit_y_gives_error(self):
         stage = make_stage("""
@@ -103,7 +113,7 @@ class TestUpAxis:
 )
 def Xform "Root" {}
 """)
-        assert has(run_validators(stage, _V), "1.1.3")
+        assert has(run_validators(stage, _V), WRONG_UP_AXIS)
 
     def test_z_up_no_violation(self):
         stage = make_stage("""
@@ -113,7 +123,7 @@ def Xform "Root" {}
 )
 def Xform "Root" {}
 """)
-        assert none_with(run_validators(stage, _V), "1.1.3")
+        assert none_with(run_validators(stage, _V), WRONG_UP_AXIS)
 
 
 # ------------------------------------------------------------------ #
@@ -136,7 +146,7 @@ def Xform "Robot" {
     uniform token[] xformOpOrder = ["xformOp:rotateX"]
 }
 """)
-        assert has(run_validators(stage, _V), "1.1.4")
+        assert has(run_validators(stage, _V), ROOT_HAS_ROTATION)
 
     def test_orient_op_on_default_prim_gives_warning(self):
         stage = make_stage("""
@@ -152,7 +162,7 @@ def Xform "Robot" {
     uniform token[] xformOpOrder = ["xformOp:orient"]
 }
 """)
-        assert has(run_validators(stage, _V), "1.1.4")
+        assert has(run_validators(stage, _V), ROOT_HAS_ROTATION)
 
     def test_translate_only_no_violation(self):
         """A translate-only xformOp on the root must not trigger 1.1.4."""
@@ -169,7 +179,7 @@ def Xform "Robot" {
     uniform token[] xformOpOrder = ["xformOp:translate"]
 }
 """)
-        assert none_with(run_validators(stage, _V), "1.1.4")
+        assert none_with(run_validators(stage, _V), ROOT_HAS_ROTATION)
 
     def test_no_xform_no_violation(self):
         stage = make_stage("""
@@ -182,7 +192,7 @@ def Xform "Robot" {
 )
 def Xform "Robot" {}
 """)
-        assert none_with(run_validators(stage, _V), "1.1.4")
+        assert none_with(run_validators(stage, _V), ROOT_HAS_ROTATION)
 
     def test_rotation_on_non_default_prim_not_flagged(self):
         """Only the defaultPrim root is checked; child rotations are fine."""
@@ -201,13 +211,13 @@ def Xform "Robot" {
     }
 }
 """)
-        assert none_with(run_validators(stage, _V), "1.1.4")
+        assert none_with(run_validators(stage, _V), ROOT_HAS_ROTATION)
 
 
 class TestTimeCodesPerSecond:
     def test_default_time_codes_per_second_gives_error(self):
         stage = make_stage('#usda 1.0\ndef Xform "Root" {}')
-        assert has(run_validators(stage, _V), "1.1.5")
+        assert has(run_validators(stage, _V), WRONG_TIME_CODES_PER_SECOND)
 
     def test_time_codes_per_second_set_to_one_no_violation(self):
         stage = make_stage("""
@@ -217,7 +227,7 @@ class TestTimeCodesPerSecond:
 )
 def Xform "Root" {}
 """)
-        assert none_with(run_validators(stage, _V), "1.1.5")
+        assert none_with(run_validators(stage, _V), WRONG_TIME_CODES_PER_SECOND)
 
 
 class TestKinematicTransformOps:
@@ -231,7 +241,7 @@ def Xform "Body" (
     uniform token[] xformOpOrder = ["xformOp:transform"]
 }
 """)
-        assert has(run_validators(stage, _V), "1.1.6")
+        assert has(run_validators(stage, _V), KINEMATIC_TRANSFORM_OPS)
 
     def test_rigid_body_with_translate_orient_only_no_violation(self):
         stage = make_stage("""
@@ -244,7 +254,7 @@ def Xform "Body" (
     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
 }
 """)
-        assert none_with(run_validators(stage, _V), "1.1.6")
+        assert none_with(run_validators(stage, _V), KINEMATIC_TRANSFORM_OPS)
 
 
 class TestKinematicScale:
@@ -260,7 +270,7 @@ def Xform "Body" (
     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
 }
 """)
-        assert has(run_validators(stage, _V), "1.1.7")
+        assert has(run_validators(stage, _V), KINEMATIC_NON_IDENTITY_SCALE)
 
     def test_identity_scale_on_rigid_body_no_violation(self):
         stage = make_stage("""
@@ -274,4 +284,4 @@ def Xform "Body" (
     uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
 }
 """)
-        assert none_with(run_validators(stage, _V), "1.1.7")
+        assert none_with(run_validators(stage, _V), KINEMATIC_NON_IDENTITY_SCALE)

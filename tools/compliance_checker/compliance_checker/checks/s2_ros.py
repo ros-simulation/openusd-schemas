@@ -7,6 +7,18 @@ import re
 from pxr import Sdf, Usd, UsdGeom, UsdPhysics
 
 from .base import ErrorType, TimeRange, ValidationError, _error, _prim_site, register_stage_validator
+from ._tokens import (
+    CAMERA_OPTICAL_FRAME, CONTEXT_INSIDE_PAYLOAD, FRAME_ON_RIGID_BODY,
+    INTERFACE_INSIDE_PAYLOAD, INTERFACE_ON_RIGID_BODY, INVALID_ACTION_STARTS_ENABLED,
+    INVALID_CONTEXT_NAMESPACE, INVALID_FRAME_ID, INVALID_FRAME_STATIC,
+    INVALID_MATCH_PUBLISHER, INVALID_OVERRIDE_FRAME_ID, INVALID_QOS_DEPTH,
+    INVALID_QOS_TOKEN, INVALID_ROS_NAME, INVALID_SERVICE_STARTS_ENABLED,
+    INVALID_STARTS_ENABLED, MISSING_ACTION_ATTR, MISSING_JOINT_NAME,
+    MISSING_PUBLISH_RATE, MISSING_SERVICE_ATTR, MISSING_TOPIC_NAME,
+    MISSING_TOPIC_ROLE, MISSING_TOPIC_TYPE, MULTIPLE_INTERFACES_PER_PRIM,
+    NESTED_CONTEXT_PARENT_FRAME, PROHIBITED_INTERFACE_TYPE, PROHIBITED_TOPIC_NAME,
+    SENSOR_NOT_DIRECT_XFORM_CHILD,
+)
 
 _ROS_NAME_RE = re.compile(r"^/?[a-zA-Z_][a-zA-Z0-9_]*(?:/[a-zA-Z_][a-zA-Z0-9_]*)*$")
 
@@ -103,14 +115,14 @@ def _validate_ros_context_placement(stage: Usd.Stage, timeRange: TimeRange) -> l
             continue
         pp = str(prim.GetPath())
         if _is_inside_payload(prim, payload_roots):
-            errors.append(_error("2.1.1", ErrorType.Warn, _prim_site(stage, pp),
+            errors.append(_error(CONTEXT_INSIDE_PAYLOAD, ErrorType.Warn, _prim_site(stage, pp),
                 f"RosContextAPI prim '{pp}' is inside a payload arc. "
                 "The namespace graph must be resolvable without loading heavy geometry; "
                 "RosContextAPI prims must reside outside payloads per REP §2.1.",
                 "Move the RosContextAPI prim above the payload boundary."))
         namespace = _str_attr(prim, "ros:context:namespace")
         if namespace and not _validate_context_namespace(namespace):
-            errors.append(_error("2.1.3", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INVALID_CONTEXT_NAMESPACE, ErrorType.Error, _prim_site(stage, pp),
                 f"RosContextAPI namespace '{namespace}' on '{pp}' "
                 "violates §2.1.1 rules. Namespaces must be either composable "
                 "(no leading/trailing slash) or absolute (leading slash), and "
@@ -119,7 +131,7 @@ def _validate_ros_context_placement(stage: Usd.Stage, timeRange: TimeRange) -> l
         if outermost and prim != outermost:
             pf_attr = prim.GetAttribute("ros:context:parent_frame")
             if pf_attr.IsValid() and pf_attr.Get() is not None:
-                errors.append(_error("2.1.2", ErrorType.Warn, _prim_site(stage, pp),
+                errors.append(_error(NESTED_CONTEXT_PARENT_FRAME, ErrorType.Warn, _prim_site(stage, pp),
                     f"Nested RosContextAPI '{pp}' sets ros:context:parent_frame, which is "
                     "only valid on the outermost context in the stage per REP §2.1.1. "
                     "This attribute will be ignored.",
@@ -141,7 +153,7 @@ def _validate_ros_interface_placement(stage: Usd.Stage, timeRange: TimeRange) ->
         for schema in _INTERFACE_SCHEMAS:
             if schema in applied and in_payload:
                 pp = str(prim.GetPath())
-                errors.append(_error("2.2.1", ErrorType.Error, _prim_site(stage, pp),
+                errors.append(_error(INTERFACE_INSIDE_PAYLOAD, ErrorType.Error, _prim_site(stage, pp),
                     f"Prim '{pp}' has {schema} but is inside a payload arc. "
                     "Interface prims must reside in the lightweight, traversable "
                     "kinematic hierarchy (outside payloads) per REP §2.2.",
@@ -164,14 +176,14 @@ def _validate_ros_interface_structure(stage: Usd.Stage, timeRange: TimeRange) ->
             continue
         pp = str(prim.GetPath())
         if prim.HasAPI(UsdPhysics.RigidBodyAPI):
-            errors.append(_error("2.2.2", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INTERFACE_ON_RIGID_BODY, ErrorType.Error, _prim_site(stage, pp),
                 f"Prim '{pp}' carries ROS interface schemas and PhysicsRigidBodyAPI. "
                 "Interface schemas should be placed on dedicated logical prims rather "
                 "than physical rigid-body prims per REP §2.2.",
                 "Move RosTopicAPI/RosServiceAPI/RosActionAPI schemas to a dedicated "
                 "child Xform (for sensor interfaces) or a logical interfaces scope."))
         if len(present) > 1:
-            errors.append(_error("2.2.3", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(MULTIPLE_INTERFACES_PER_PRIM, ErrorType.Error, _prim_site(stage, pp),
                 f"Prim '{pp}' carries multiple interface schemas {sorted(present)}. "
                 "Sensor interfaces must use one interface schema per prim per REP §2.2.",
                 "Split interfaces across separate child prims (for example, one prim "
@@ -181,7 +193,7 @@ def _validate_ros_interface_structure(stage: Usd.Stage, timeRange: TimeRange) ->
             parent = prim.GetParent()
             is_direct_child = parent and parent.IsValid() and parent == rigid_ancestor
             if not is_direct_child or prim.GetTypeName() != "Xform":
-                errors.append(_error("2.2.4", ErrorType.Warn, _prim_site(stage, pp),
+                errors.append(_error(SENSOR_NOT_DIRECT_XFORM_CHILD, ErrorType.Warn, _prim_site(stage, pp),
                     f"Sensor interface prim '{pp}' is under rigid body "
                     f"'{rigid_ancestor.GetPath()}', but sensor interfaces should be authored "
                     "on a direct child UsdGeomXform of the physical link per REP §2.2.",
@@ -208,22 +220,22 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     type_ = _str_attr(prim, "ros:topic:type")
 
     if not role:
-        errors.append(_error("2.4.1", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(MISSING_TOPIC_ROLE, ErrorType.Error, _prim_site(stage, pp),
             f"RosTopicAPI prim '{pp}' is missing required 'ros:topic:role'.",
             'Set `token ros:topic:role = "publisher"` or `"subscription"`.'))
     elif role not in _ALLOWED_TOPIC_ROLES:
-        errors.append(_error("2.4.1", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(MISSING_TOPIC_ROLE, ErrorType.Error, _prim_site(stage, pp),
             f"RosTopicAPI prim '{pp}' has invalid role '{role}'. "
             f"Allowed values: {sorted(_ALLOWED_TOPIC_ROLES)}.",
             "Use 'publisher' or 'subscription'."))
 
     if not name:
-        errors.append(_error("2.4.2", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(MISSING_TOPIC_NAME, ErrorType.Error, _prim_site(stage, pp),
             f"RosTopicAPI prim '{pp}' is missing required 'ros:topic:name'.",
             'Set `string ros:topic:name = "<topic_name>"`.'))
     else:
         if not _validate_ros_name(name):
-            errors.append(_error("2.3.1", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INVALID_ROS_NAME, ErrorType.Error, _prim_site(stage, pp),
                 f"'ros:topic:name' value '{name}' on '{pp}' violates ROS 2 naming rules. "
                 "Names must contain only alphanumeric characters, underscores, and "
                 "forward slashes, and must not start with a number.",
@@ -231,19 +243,19 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
                 "(e.g. 'joint_states', '/robot_1/cmd_vel')."))
         for prohibited in _PROHIBITED_TOPIC_NAMES:
             if name == prohibited or name.endswith(prohibited):
-                errors.append(_error("2.9.1", ErrorType.Error, _prim_site(stage, pp),
+                errors.append(_error(PROHIBITED_TOPIC_NAME, ErrorType.Error, _prim_site(stage, pp),
                     f"Topic name '{name}' is a prohibited simulator-level interface "
                     "(/clock). Assets must not include simulator-level interfaces per REP §2.9.",
                     "Remove this interface from the asset."))
 
     if not type_:
-        errors.append(_error("2.4.3", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(MISSING_TOPIC_TYPE, ErrorType.Error, _prim_site(stage, pp),
             f"RosTopicAPI prim '{pp}' is missing required 'ros:topic:type'.",
             'Set `string ros:topic:type = "<pkg>/msg/<Type>"`.'))
     else:
         for prohibited in _PROHIBITED_TYPES:
             if type_.startswith(prohibited):
-                errors.append(_error("2.9.2", ErrorType.Error, _prim_site(stage, pp),
+                errors.append(_error(PROHIBITED_INTERFACE_TYPE, ErrorType.Error, _prim_site(stage, pp),
                     f"Interface type '{type_}' on '{pp}' is a prohibited simulator-level "
                     "interface. Assets must not include interfaces from "
                     "simulation_interfaces or rosgraph_msgs/Clock per REP §2.9.",
@@ -252,7 +264,7 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     if role == "publisher":
         rate_attr = prim.GetAttribute("ros:topic:publish_rate")
         if not rate_attr.IsValid() or rate_attr.Get() is None:
-            errors.append(_error("2.4.4", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(MISSING_PUBLISH_RATE, ErrorType.Error, _prim_site(stage, pp),
                 f"Publisher RosTopicAPI prim '{pp}' is missing 'ros:topic:publish_rate'. "
                 "Required for all publishers per REP §2.4.",
                 "Set `double ros:topic:publish_rate = <Hz>`."))
@@ -265,7 +277,7 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     ):
         val = _str_attr(prim, attr_name)
         if val is not None and val not in allowed:
-            errors.append(_error("2.4.5", ErrorType.Warn, _prim_site(stage, pp),
+            errors.append(_error(INVALID_QOS_TOKEN, ErrorType.Warn, _prim_site(stage, pp),
                 f"QoS attribute '{attr_name}' on '{pp}' has value '{val}' "
                 f"which is not in the allowed set {sorted(allowed)}.",
                 f"Use one of: {sorted(allowed)}."))
@@ -275,12 +287,12 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     if mp_attr.IsValid():
         mp_val = mp_attr.Get()
         if not isinstance(mp_val, bool):
-            errors.append(_error("2.4.8", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INVALID_MATCH_PUBLISHER, ErrorType.Error, _prim_site(stage, pp),
                 f"'ros:topic:qos:match_publisher' on '{pp}' must be a bool. "
                 f"Got {type(mp_val).__name__}.",
                 "Use `bool ros:topic:qos:match_publisher = true|false`."))
         elif mp_val and role == "publisher":
-            errors.append(_error("2.4.8", ErrorType.Warn, _prim_site(stage, pp),
+            errors.append(_error(INVALID_MATCH_PUBLISHER, ErrorType.Warn, _prim_site(stage, pp),
                 f"'ros:topic:qos:match_publisher' is true on publisher '{pp}'. "
                 "This QoS option is only applicable to subscriptions per REP §2.4.",
                 "Unset this attribute on publishers."))
@@ -290,14 +302,14 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     if depth_attr.IsValid():
         depth = depth_attr.Get()
         if not isinstance(depth, int):
-            errors.append(_error("2.4.9", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INVALID_QOS_DEPTH, ErrorType.Error, _prim_site(stage, pp),
                 f"'ros:topic:qos:depth' on '{pp}' must be an int. "
                 f"Got {type(depth).__name__}.",
                 "Use a positive integer depth."))
         else:
             history = _str_attr(prim, "ros:topic:qos:history")
             if history == "keep_last" and depth <= 0:
-                errors.append(_error("2.4.9", ErrorType.Error, _prim_site(stage, pp),
+                errors.append(_error(INVALID_QOS_DEPTH, ErrorType.Error, _prim_site(stage, pp),
                     f"'ros:topic:qos:depth' on '{pp}' is {depth}. "
                     "Depth must be > 0 when history is keep_last.",
                     "Set `ros:topic:qos:depth` to a positive integer."))
@@ -307,7 +319,7 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     if se_attr.IsValid():
         se_val = _bool_attr(prim, "ros:topic:starts_enabled")
         if not isinstance(se_val, bool):
-            errors.append(_error("2.4.6", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INVALID_STARTS_ENABLED, ErrorType.Error, _prim_site(stage, pp),
                 f"'ros:topic:starts_enabled' on '{pp}' must be a bool. "
                 f"Got {type(se_val).__name__}.",
                 "Use `bool ros:topic:starts_enabled = true|false`."))
@@ -318,12 +330,12 @@ def _check_topic(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
         ofi_val = _str_attr(prim, "ros:topic:override_frame_id")
         if ofi_val is not None:
             if not isinstance(ofi_val, str):
-                errors.append(_error("2.4.7", ErrorType.Error, _prim_site(stage, pp),
+                errors.append(_error(INVALID_OVERRIDE_FRAME_ID, ErrorType.Error, _prim_site(stage, pp),
                     f"'ros:topic:override_frame_id' on '{pp}' must be a string. "
                     f"Got {type(ofi_val).__name__}.",
                     'Use `string ros:topic:override_frame_id = "map"`.'))
             elif ofi_val and not _validate_ros_name(ofi_val):
-                errors.append(_error("2.4.7", ErrorType.Warn, _prim_site(stage, pp),
+                errors.append(_error(INVALID_OVERRIDE_FRAME_ID, ErrorType.Warn, _prim_site(stage, pp),
                     f"'ros:topic:override_frame_id' value '{ofi_val}' on '{pp}' "
                     "does not follow ROS naming rules.",
                     "Use a valid ROS frame name (e.g. 'map', 'earth', '/robot/base_link')."))
@@ -351,9 +363,9 @@ def _check_service(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     errors: list[ValidationError] = []
     pp = str(prim.GetPath())
     for attr_name, check_id, hint in (
-        ("ros:service:role", "2.5.1", "Use 'server' or 'client'."),
-        ("ros:service:name", "2.5.1", "Set a valid ROS 2 service name."),
-        ("ros:service:type", "2.5.1", 'Set `string ros:service:type = "<pkg>/srv/<Type>"`'),
+        ("ros:service:role", MISSING_SERVICE_ATTR, "Use 'server' or 'client'."),
+        ("ros:service:name", MISSING_SERVICE_ATTR, "Set a valid ROS 2 service name."),
+        ("ros:service:type", MISSING_SERVICE_ATTR, 'Set `string ros:service:type = "<pkg>/srv/<Type>"`'),
     ):
         if not _str_attr(prim, attr_name):
             errors.append(_error(check_id, ErrorType.Error, _prim_site(stage, pp),
@@ -361,14 +373,14 @@ def _check_service(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
 
     role = _str_attr(prim, "ros:service:role")
     if role and role not in _ALLOWED_SERVICE_ROLES:
-        errors.append(_error("2.5.1", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(MISSING_SERVICE_ATTR, ErrorType.Error, _prim_site(stage, pp),
             f"RosServiceAPI prim '{pp}' has invalid role '{role}'. "
             f"Allowed: {sorted(_ALLOWED_SERVICE_ROLES)}.",
             "Use 'server' or 'client'."))
 
     name = _str_attr(prim, "ros:service:name")
     if name and not _validate_ros_name(name):
-        errors.append(_error("2.3.1", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(INVALID_ROS_NAME, ErrorType.Error, _prim_site(stage, pp),
             f"'ros:service:name' value '{name}' on '{pp}' violates ROS 2 naming rules.",
             "Use only alphanumeric characters, underscores, and forward slashes."))
 
@@ -376,7 +388,7 @@ def _check_service(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     if type_:
         for prohibited in _PROHIBITED_TYPES:
             if type_.startswith(prohibited):
-                errors.append(_error("2.9.2", ErrorType.Error, _prim_site(stage, pp),
+                errors.append(_error(PROHIBITED_INTERFACE_TYPE, ErrorType.Error, _prim_site(stage, pp),
                     f"Service type '{type_}' on '{pp}' is a prohibited simulator-level "
                     "interface. Assets must not include interfaces from "
                     "simulation_interfaces or rosgraph_msgs/Clock per REP §2.9.",
@@ -387,7 +399,7 @@ def _check_service(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     if se_attr.IsValid():
         se_val = _bool_attr(prim, "ros:service:starts_enabled")
         if not isinstance(se_val, bool):
-            errors.append(_error("2.5.2", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INVALID_SERVICE_STARTS_ENABLED, ErrorType.Error, _prim_site(stage, pp),
                 f"'ros:service:starts_enabled' on '{pp}' must be a bool. "
                 f"Got {type(se_val).__name__}.",
                 "Use `bool ros:service:starts_enabled = true|false`."))
@@ -414,9 +426,9 @@ def _check_action(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     errors: list[ValidationError] = []
     pp = str(prim.GetPath())
     for attr_name, check_id, hint in (
-        ("ros:action:role", "2.6.1", "Use 'server' or 'client'."),
-        ("ros:action:name", "2.6.1", "Set a valid ROS 2 action name."),
-        ("ros:action:type", "2.6.1", 'Set `string ros:action:type = "<pkg>/action/<Type>"`'),
+        ("ros:action:role", MISSING_ACTION_ATTR, "Use 'server' or 'client'."),
+        ("ros:action:name", MISSING_ACTION_ATTR, "Set a valid ROS 2 action name."),
+        ("ros:action:type", MISSING_ACTION_ATTR, 'Set `string ros:action:type = "<pkg>/action/<Type>"`'),
     ):
         if not _str_attr(prim, attr_name):
             errors.append(_error(check_id, ErrorType.Error, _prim_site(stage, pp),
@@ -424,14 +436,14 @@ def _check_action(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
 
     role = _str_attr(prim, "ros:action:role")
     if role and role not in _ALLOWED_ACTION_ROLES:
-        errors.append(_error("2.6.1", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(MISSING_ACTION_ATTR, ErrorType.Error, _prim_site(stage, pp),
             f"RosActionAPI prim '{pp}' has invalid role '{role}'. "
             f"Allowed: {sorted(_ALLOWED_ACTION_ROLES)}.",
             "Use 'server' or 'client'."))
 
     name = _str_attr(prim, "ros:action:name")
     if name and not _validate_ros_name(name):
-        errors.append(_error("2.3.1", ErrorType.Error, _prim_site(stage, pp),
+        errors.append(_error(INVALID_ROS_NAME, ErrorType.Error, _prim_site(stage, pp),
             f"'ros:action:name' value '{name}' on '{pp}' violates ROS 2 naming rules.",
             "Use only alphanumeric characters, underscores, and forward slashes."))
 
@@ -439,7 +451,7 @@ def _check_action(stage: Usd.Stage, prim: Usd.Prim) -> list[ValidationError]:
     if se_attr.IsValid():
         se_val = _bool_attr(prim, "ros:action:starts_enabled")
         if not isinstance(se_val, bool):
-            errors.append(_error("2.6.2", ErrorType.Error, _prim_site(stage, pp),
+            errors.append(_error(INVALID_ACTION_STARTS_ENABLED, ErrorType.Error, _prim_site(stage, pp),
                 f"'ros:action:starts_enabled' on '{pp}' must be a bool. "
                 f"Got {type(se_val).__name__}.",
                 "Use `bool ros:action:starts_enabled = true|false`."))
@@ -465,7 +477,7 @@ def _validate_ros_frame_api(stage: Usd.Stage, timeRange: TimeRange) -> list[Vali
         if "RosFrameAPI" not in _applied(prim):
             continue
         if prim.HasAPI(UsdPhysics.RigidBodyAPI):
-            errors.append(_error("2.7.1", ErrorType.Warn, _site(stage, prim),
+            errors.append(_error(FRAME_ON_RIGID_BODY, ErrorType.Warn, _site(stage, prim),
                 f"Prim '{prim.GetPath()}' has both RosFrameAPI and PhysicsRigidBodyAPI. "
                 "Physical links connected via joints receive implicit TF broadcasting; "
                 "explicit RosFrameAPI is redundant and may cause duplicate frames.",
@@ -491,11 +503,11 @@ def _validate_ros_frame_attributes(stage: Usd.Stage, timeRange: TimeRange) -> li
             fid_val = _str_attr(prim, "ros:frame:id")
             if fid_val is not None:
                 if not isinstance(fid_val, str):
-                    errors.append(_error("2.7.2", ErrorType.Error, _prim_site(stage, pp),
+                    errors.append(_error(INVALID_FRAME_ID, ErrorType.Error, _prim_site(stage, pp),
                         f"'ros:frame:id' on '{pp}' must be a string. Got {type(fid_val).__name__}.",
                         'Use `string ros:frame:id = "camera_optical_frame"`.'))
                 elif fid_val and not _validate_ros_name(fid_val):
-                    errors.append(_error("2.7.2", ErrorType.Warn, _prim_site(stage, pp),
+                    errors.append(_error(INVALID_FRAME_ID, ErrorType.Warn, _prim_site(stage, pp),
                         f"'ros:frame:id' value '{fid_val}' on '{pp}' does not follow ROS naming rules.",
                         "Use a valid TF frame name (e.g. 'base_link', 'camera_optical_frame')."))
 
@@ -503,7 +515,7 @@ def _validate_ros_frame_attributes(stage: Usd.Stage, timeRange: TimeRange) -> li
         if fs_attr.IsValid():
             fs_val = _bool_attr(prim, "ros:frame:static")
             if not isinstance(fs_val, bool):
-                errors.append(_error("2.7.3", ErrorType.Error, _prim_site(stage, pp),
+                errors.append(_error(INVALID_FRAME_STATIC, ErrorType.Error, _prim_site(stage, pp),
                     f"'ros:frame:static' on '{pp}' must be a bool. Got {type(fs_val).__name__}.",
                     "Use `bool ros:frame:static = true|false`."))
     return errors
@@ -520,7 +532,7 @@ def _validate_camera_optical_frame(stage: Usd.Stage, timeRange: TimeRange) -> li
         if prim.GetTypeName() != "Camera":
             continue
         if "RosTopicAPI" in _applied(prim):
-            errors.append(_error("2.8.1", ErrorType.Warn, _site(stage, prim),
+            errors.append(_error(CAMERA_OPTICAL_FRAME, ErrorType.Warn, _site(stage, prim),
                 f"RosTopicAPI is applied directly to Camera prim '{prim.GetPath()}'. "
                 "OpenUSD cameras face -Z; ROS optical frames must face +Z. "
                 "Authors must create a child Xform rotated 180° around X and apply "
@@ -539,7 +551,7 @@ def _validate_camera_optical_frame(stage: Usd.Stage, timeRange: TimeRange) -> li
                 for op in xformable.GetOrderedXformOps()
             )
             if not has_x_rotation:
-                errors.append(_error("2.8.1", ErrorType.Warn, _site(stage, child),
+                errors.append(_error(CAMERA_OPTICAL_FRAME, ErrorType.Warn, _site(stage, child),
                     f"Camera child prim '{child.GetPath()}' carries ROS interface schemas "
                     "but has no detected X-axis rotation. The optical frame must be rotated "
                     "180° around its local X-axis to align OpenUSD (-Z forward) with ROS "
@@ -567,7 +579,7 @@ def _validate_ros_joint_name(stage: Usd.Stage, timeRange: TimeRange) -> list[Val
             continue
         attr = prim.GetAttribute("ros:joint:name")
         if not attr.IsValid() or attr.Get() is None:
-            errors.append(_error("2.10.1", ErrorType.Warn, _site(stage, prim),
+            errors.append(_error(MISSING_JOINT_NAME, ErrorType.Warn, _site(stage, prim),
                 f"Joint prim '{prim.GetPath()}' ({prim.GetTypeName()}) is missing "
                 "the 'ros:joint:name' custom property. Without it, simulators fall "
                 "back to the prim name, which may not match robot descriptions or "

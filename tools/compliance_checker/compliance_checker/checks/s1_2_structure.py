@@ -13,6 +13,20 @@ from .base import (
     _stage_site,
     register_stage_validator,
 )
+from ._tokens import (
+    ABSOLUTE_OR_PROPRIETARY_PATH,
+    CUSTOM_COMPOSITION_ATTR,
+    HEAVY_LAYER_ASCII,
+    INHERITS_SPECIALIZES_ARC,
+    MISSING_ASSET_IDENTIFIER,
+    MISSING_ASSET_VERSION,
+    MISSING_DEFAULT_PRIM,
+    NESTED_COMPONENT,
+    PAYLOAD_GATES_KINEMATIC,
+    POINT_INSTANCER_PHYSICS,
+    SCHEMA_LAYER_BINARY,
+    VARIANT_NO_DEFAULT,
+)
 
 _FORBIDDEN_SCHEMES = ("omniverse://",)
 _PREFAB_ATTR_HINTS = ("prefabpath", "assetref", "assetpath", "spawnpath", "modelpath")
@@ -40,7 +54,7 @@ def _check_asset_management(
     default_prim = stage.GetDefaultPrim()
     if not (default_prim and default_prim.IsValid()):
         return [_error(
-            "1.2.1", ErrorType.Warn, _stage_site(stage),
+            MISSING_DEFAULT_PRIM, ErrorType.Warn, _stage_site(stage),
             "defaultPrim metadata is not set on the root layer. "
             "Referencing this asset without an explicit prim path is undefined behaviour "
             "and the Payload pattern breaks silently.",
@@ -51,7 +65,7 @@ def _check_asset_management(
     asset_info = default_prim.GetMetadata("assetInfo") or {}
     if "identifier" not in asset_info:
         errors.append(_error(
-            "1.2.2", ErrorType.Warn, prim_site,
+            MISSING_ASSET_IDENTIFIER, ErrorType.Warn, prim_site,
             "defaultPrim is missing assetInfo:identifier. "
             "A unique, stable identifier (URI or canonical name) is required per REP §1.2.5.",
             'Add `string assetInfo:identifier = "<uri-or-name>"` '
@@ -59,7 +73,7 @@ def _check_asset_management(
         ))
     if "version" not in asset_info:
         errors.append(_error(
-            "1.2.3", ErrorType.Warn, prim_site,
+            MISSING_ASSET_VERSION, ErrorType.Warn, prim_site,
             "defaultPrim is missing assetInfo:version. "
             "A version string (e.g. '1.0.0') is required per REP §1.2.5.",
             'Add `string assetInfo:version = "1.0.0"` '
@@ -87,7 +101,7 @@ def _check_path_convention(
                 ref_path.startswith(s) for s in _FORBIDDEN_SCHEMES
             ):
                 errors.append(_error(
-                    "1.2.4", ErrorType.Error, _stage_site(stage),
+                    ABSOLUTE_OR_PROPRIETARY_PATH, ErrorType.Error, _stage_site(stage),
                     f"Absolute path '{ref_path}' found in layer '{layer_id}'. "
                     "Internal references must use relative paths per REP §1.2.5.",
                     "Convert to a relative path (e.g. './geo/mesh.usdc').",
@@ -95,7 +109,7 @@ def _check_path_convention(
             for scheme in _FORBIDDEN_SCHEMES:
                 if ref_path.lower().startswith(scheme):
                     errors.append(_error(
-                        "1.2.4", ErrorType.Error, _stage_site(stage),
+                        ABSOLUTE_OR_PROPRIETARY_PATH, ErrorType.Error, _stage_site(stage),
                         f"Proprietary URI scheme detected: '{ref_path}' in layer '{layer_id}'. "
                         "Absolute paths and proprietary schemes (e.g. omniverse://) "
                         "are strictly prohibited per REP §1.2.5.",
@@ -110,7 +124,7 @@ def _check_path_convention(
                 continue
             if any(hint in attr.GetName().lower() for hint in _PREFAB_ATTR_HINTS):
                 errors.append(_error(
-                    "1.2.9", ErrorType.Error, _prim_site(stage, str(prim.GetPath())),
+                    CUSTOM_COMPOSITION_ATTR, ErrorType.Error, _prim_site(stage, str(prim.GetPath())),
                     f"Custom string attribute '{attr.GetName()}' may be used for "
                     "dynamic composition or asset loading, which is prohibited per REP §1.2.5. "
                     "Asset composition must use native USD references or payloads only.",
@@ -139,7 +153,7 @@ def _check_composition_model(
                 continue
             if Usd.ModelAPI(descendant).GetKind() == Kind.Tokens.component:
                 errors.append(_error(
-                    "1.2.6", ErrorType.Warn, _prim_site(stage, str(descendant.GetPath())),
+                    NESTED_COMPONENT, ErrorType.Warn, _prim_site(stage, str(descendant.GetPath())),
                     f"Prim '{descendant.GetPath()}' has kind='component' but is a "
                     f"descendant of '{prim.GetPath()}' which is also kind='component'. "
                     "A component must not contain another component per REP §1.2.2.",
@@ -162,7 +176,7 @@ def _check_variant_default(
         for vs_name in prim.GetVariantSets().GetNames():
             if not prim.GetVariantSets().GetVariantSet(vs_name).GetVariantSelection():
                 errors.append(_error(
-                    "1.2.7", ErrorType.Warn, _prim_site(stage, str(prim.GetPath())),
+                    VARIANT_NO_DEFAULT, ErrorType.Warn, _prim_site(stage, str(prim.GetPath())),
                     f"VariantSet '{vs_name}' on prim '{prim.GetPath()}' has no default "
                     "variant selection. Loading this asset without explicit overrides "
                     "will resolve to an indeterminate state.",
@@ -185,7 +199,7 @@ def _check_inherits_specializes(
         pp = str(prim.GetPath())
         for path in prim.GetInherits().GetAllDirectInherits():
             errors.append(_error(
-                "1.2.8", ErrorType.Warn, _prim_site(stage, pp),
+                INHERITS_SPECIALIZES_ARC, ErrorType.Warn, _prim_site(stage, pp),
                 f"Prim '{pp}' uses an Inherits arc targeting '{path}'. "
                 "Verify that the target class is defined within this asset's own layer "
                 "stack; external class dependencies break portability (REP §1.2.3).",
@@ -200,7 +214,7 @@ def _check_inherits_specializes(
                     continue
                 seen.add(path_str)
                 errors.append(_error(
-                    "1.2.8", ErrorType.Warn, _prim_site(stage, pp),
+                    INHERITS_SPECIALIZES_ARC, ErrorType.Warn, _prim_site(stage, pp),
                     f"Prim '{pp}' uses a Specializes arc targeting '{path}'. "
                     "Verify that the target class is defined within this asset's own layer "
                     "stack; external class dependencies break portability (REP §1.2.3).",
@@ -231,7 +245,7 @@ def _check_payload_kinematic_topology(
         forbidden = applied & _PHYSICS_ROS_APIS
         if root.GetTypeName() in _KINEMATIC_JOINT_TYPES or forbidden:
             errors.append(_error(
-                "1.2.10", ErrorType.Error, _prim_site(stage, str(root.GetPath())),
+                PAYLOAD_GATES_KINEMATIC, ErrorType.Error, _prim_site(stage, str(root.GetPath())),
                 f"Payload root '{root.GetPath()}' carries kinematic/ROS schemas "
                 f"(type={root.GetTypeName()}, apis={sorted(forbidden)}). "
                 "Payloads must not gate joints, rigid bodies, or Ros*API topology per REP §1.2.3.",
@@ -280,7 +294,7 @@ def _check_layer_encoding(
         has_heavy = _layer_has_heavy_geometry(layer.pseudoRoot)
         if has_schemas and ext == "usdc":
             errors.append(_error(
-                "1.2.12", ErrorType.Warn, _stage_site(stage),
+                SCHEMA_LAYER_BINARY, ErrorType.Warn, _stage_site(stage),
                 f"Layer '{identifier}' contains API schemas but uses binary .usdc encoding. "
                 "Schema- and relationship-bearing layers must be authored as ASCII (.usda) "
                 "per REP §1.2.1.",
@@ -288,7 +302,7 @@ def _check_layer_encoding(
             ))
         if has_heavy and ext == "usda":
             errors.append(_error(
-                "1.2.13", ErrorType.Warn, _stage_site(stage),
+                HEAVY_LAYER_ASCII, ErrorType.Warn, _stage_site(stage),
                 f"Layer '{identifier}' contains heavy geometry data but uses ASCII .usda encoding. "
                 "Heavy-data layers should use binary Crate encoding (.usdc) for performance "
                 "per REP §1.2.1.",
@@ -331,7 +345,7 @@ def _check_parallel_simulation_instancing(
                 continue
             if _contains_forbidden_semantics(proto):
                 errors.append(_error(
-                    "1.2.11", ErrorType.Error, _prim_site(stage, str(prim.GetPath())),
+                    POINT_INSTANCER_PHYSICS, ErrorType.Error, _prim_site(stage, str(prim.GetPath())),
                     f"PointInstancer '{prim.GetPath()}' references prototype '{target}' "
                     "that contains physics/ROS semantics. REP §1.2.6 forbids using USD "
                     "instancing to clone articulated physics assets for massive arrays.",

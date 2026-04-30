@@ -7,6 +7,13 @@ from collections import defaultdict
 from pxr import Usd
 
 from .base import ErrorType, TimeRange, _error, _prim_site, register_stage_validator
+from ._tokens import (
+    ACTUATOR_INVALID_TARGETS,
+    CLAMPING_LOOKUP_TABLE,
+    MIMIC_CYCLE,
+    MIMIC_INVALID_RELATIONSHIP,
+    MIMIC_WRONG_JOINT_TYPE,
+)
 
 _ALLOWED_JOINT_TYPES = {"PhysicsRevoluteJoint", "PhysicsPrismaticJoint"}
 
@@ -27,7 +34,7 @@ def _check_cycle_free_graph(mimic_graph: dict[str, list[str]], stage: Usd.Stage)
         if node in visiting:
             cycle = stack[stack.index(node):] + [node]
             errors.append(_error(
-                "4.2.3", ErrorType.Error, _prim_site(stage, node),
+                MIMIC_CYCLE, ErrorType.Error, _prim_site(stage, node),
                 f"ExtendedPhysicsMimicAPI relationships must form a DAG. "
                 f"Detected cycle: {' -> '.join(cycle)}.",
                 "Break the mimic cycle by removing one coupling edge.",
@@ -57,7 +64,7 @@ def _validate_extended_physics_mimic(stage: Usd.Stage, timeRange: TimeRange) -> 
         pp = str(prim.GetPath())
         if prim.GetTypeName() not in _ALLOWED_JOINT_TYPES:
             errors.append(_error(
-                "4.2.1", ErrorType.Warn, _prim_site(stage, pp),
+                MIMIC_WRONG_JOINT_TYPE, ErrorType.Warn, _prim_site(stage, pp),
                 f"ExtendedPhysicsMimicAPI is applied to '{pp}' (type: '{prim.GetTypeName()}'). "
                 "Must only be applied to PhysicsRevoluteJoint or PhysicsPrismaticJoint per REP §4.2.2.",
                 "Remove ExtendedPhysicsMimicAPI or change the joint type.",
@@ -66,7 +73,7 @@ def _validate_extended_physics_mimic(stage: Usd.Stage, timeRange: TimeRange) -> 
         rel = prim.GetRelationship("ext_physics:mimic:joint")
         if not rel.IsValid() or not rel.GetTargets():
             errors.append(_error(
-                "4.2.2", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_INVALID_RELATIONSHIP, ErrorType.Error, _prim_site(stage, pp),
                 f"ExtendedPhysicsMimicAPI on '{pp}' is missing required relationship "
                 "'ext_physics:mimic:joint'. The leader joint must be specified per REP §4.2.2.",
                 "Author `rel ext_physics:mimic:joint = </path/to/source_joint>`.",
@@ -75,7 +82,7 @@ def _validate_extended_physics_mimic(stage: Usd.Stage, timeRange: TimeRange) -> 
         targets = rel.GetTargets()
         if len(targets) != 1:
             errors.append(_error(
-                "4.2.2", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_INVALID_RELATIONSHIP, ErrorType.Error, _prim_site(stage, pp),
                 f"'ext_physics:mimic:joint' on '{pp}' must target exactly one "
                 f"source joint; found {len(targets)} targets.",
                 "Keep exactly one relationship target.",
@@ -85,7 +92,7 @@ def _validate_extended_physics_mimic(stage: Usd.Stage, timeRange: TimeRange) -> 
         source = stage.GetPrimAtPath(target)
         if not source or not source.IsValid():
             errors.append(_error(
-                "4.2.2", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_INVALID_RELATIONSHIP, ErrorType.Error, _prim_site(stage, pp),
                 f"'ext_physics:mimic:joint' on '{pp}' targets '{target}', "
                 "which does not exist in the composed stage.",
                 "Point to an existing revolute/prismatic joint prim.",
@@ -93,7 +100,7 @@ def _validate_extended_physics_mimic(stage: Usd.Stage, timeRange: TimeRange) -> 
             continue
         if source.GetTypeName() not in _ALLOWED_JOINT_TYPES:
             errors.append(_error(
-                "4.2.2", ErrorType.Error, _prim_site(stage, pp),
+                MIMIC_INVALID_RELATIONSHIP, ErrorType.Error, _prim_site(stage, pp),
                 f"'ext_physics:mimic:joint' on '{pp}' targets '{target}' "
                 f"(type '{source.GetTypeName()}'). Source must be revolute or prismatic per REP §4.2.2.",
                 "Target a PhysicsRevoluteJoint or PhysicsPrismaticJoint.",
@@ -113,7 +120,7 @@ def _validate_extended_physics_actuator(stage: Usd.Stage, timeRange: TimeRange) 
         rel = prim.GetRelationship("ext_physics:actuator:targets")
         if not rel.IsValid() or not rel.GetTargets():
             errors.append(_error(
-                "4.2.4", ErrorType.Error, _prim_site(stage, pp),
+                ACTUATOR_INVALID_TARGETS, ErrorType.Error, _prim_site(stage, pp),
                 f"ExtendedPhysicsActuatorAPI on '{pp}' is missing required relationship "
                 "'ext_physics:actuator:targets'. The target joint must be specified per REP §4.2.2.",
                 "Author `rel ext_physics:actuator:targets = </path/to/joint>`.",
@@ -123,7 +130,7 @@ def _validate_extended_physics_actuator(stage: Usd.Stage, timeRange: TimeRange) 
             target_prim = stage.GetPrimAtPath(target)
             if not target_prim or not target_prim.IsValid():
                 errors.append(_error(
-                    "4.2.4", ErrorType.Error, _prim_site(stage, pp),
+                    ACTUATOR_INVALID_TARGETS, ErrorType.Error, _prim_site(stage, pp),
                     f"'ext_physics:actuator:targets' on '{pp}' targets '{target}', "
                     "which does not exist in the composed stage.",
                     "Point to an existing PhysicsRevoluteJoint or PhysicsPrismaticJoint.",
@@ -131,7 +138,7 @@ def _validate_extended_physics_actuator(stage: Usd.Stage, timeRange: TimeRange) 
                 continue
             if target_prim.GetTypeName() not in _ALLOWED_JOINT_TYPES:
                 errors.append(_error(
-                    "4.2.4", ErrorType.Error, _prim_site(stage, pp),
+                    ACTUATOR_INVALID_TARGETS, ErrorType.Error, _prim_site(stage, pp),
                     f"'ext_physics:actuator:targets' on '{pp}' targets '{target}' "
                     f"(type '{target_prim.GetTypeName()}'). Only PhysicsRevoluteJoint or "
                     "PhysicsPrismaticJoint are supported per REP §4.2.2.",
@@ -156,7 +163,7 @@ def _validate_extended_physics_position_clamping(stage: Usd.Stage, timeRange: Ti
         efforts = list(efforts) if efforts is not None else []
         if len(positions) != len(efforts):
             errors.append(_error(
-                "4.2.5", ErrorType.Error, _prim_site(stage, pp),
+                CLAMPING_LOOKUP_TABLE, ErrorType.Error, _prim_site(stage, pp),
                 f"ExtendedPhysicsPositionBasedClampingAPI on '{pp}' has "
                 f"lookupPositions length {len(positions)} but lookupEfforts length "
                 f"{len(efforts)}. Both arrays must be the same length per REP §4.2.2.",
@@ -166,7 +173,7 @@ def _validate_extended_physics_position_clamping(stage: Usd.Stage, timeRange: Ti
             for i in range(len(positions) - 1):
                 if positions[i] >= positions[i + 1]:
                     errors.append(_error(
-                        "4.2.5", ErrorType.Error, _prim_site(stage, pp),
+                        CLAMPING_LOOKUP_TABLE, ErrorType.Error, _prim_site(stage, pp),
                         f"ExtendedPhysicsPositionBasedClampingAPI on '{pp}' has "
                         f"non-monotonically-increasing lookupPositions at index {i} "
                         f"(values {positions[i]} >= {positions[i + 1]}). "
