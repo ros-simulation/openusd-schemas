@@ -15,19 +15,9 @@ Check IDs covered:
 
 import os
 
-from compliance_checker.checks.s1_2_structure import (
-    AssetManagementCheck,
-    CompositionModelCheck,
-    InheritsSpecializesCheck,
-    LayerEncodingCheck,
-    ParallelSimulationInstancingCheck,
-    PathConventionCheck,
-    PayloadKinematicTopologyCheck,
-    VariantDefaultCheck,
-)
 from pxr import Sdf, Usd
 
-from .conftest import has, make_stage, none_with, run_check
+from .conftest import has, make_stage, none_with, run_validators
 
 # ------------------------------------------------------------------ #
 # §1.2.1 – defaultPrim                                                 #
@@ -40,7 +30,7 @@ class TestDefaultPrim:
 #usda 1.0
 def Xform "Robot" {}
 """)
-        assert has(run_check(stage, AssetManagementCheck), "1.2.1")
+        assert has(run_validators(stage, "rep0158:AssetManagement"), "1.2.1")
 
     def test_set_default_prim_clears_warning(self):
         stage = make_stage("""
@@ -56,7 +46,7 @@ def Xform "Robot"
     }
 ) {}
 """)
-        assert none_with(run_check(stage, AssetManagementCheck), "1.2.1")
+        assert none_with(run_validators(stage, "rep0158:AssetManagement"), "1.2.1")
 
 
 # ------------------------------------------------------------------ #
@@ -78,7 +68,7 @@ def Xform "Robot"
     }
 ) {}
 """)
-        assert has(run_check(stage, AssetManagementCheck), "1.2.2")
+        assert has(run_validators(stage, "rep0158:AssetManagement"), "1.2.2")
 
     def test_missing_version_gives_warning(self):
         stage = make_stage("""
@@ -93,7 +83,7 @@ def Xform "Robot"
     }
 ) {}
 """)
-        assert has(run_check(stage, AssetManagementCheck), "1.2.3")
+        assert has(run_validators(stage, "rep0158:AssetManagement"), "1.2.3")
 
     def test_complete_asset_info_no_violation(self):
         stage = make_stage("""
@@ -109,7 +99,7 @@ def Xform "Robot"
     }
 ) {}
 """)
-        v = run_check(stage, AssetManagementCheck)
+        v = run_validators(stage, "rep0158:AssetManagement")
         assert none_with(v, "1.2.2")
         assert none_with(v, "1.2.3")
 
@@ -124,16 +114,13 @@ class TestPathConventions:
         target = tmp_path / "geo.usda"
         target.write_text("#usda 1.0\n")
         main = tmp_path / "main.usda"
-        # Use an absolute path reference
         main.write_text(f"""#usda 1.0
 def Xform "Robot" (
     references = @{target}@
 ) {{}}
 """)
-        from pxr import Usd
-
         stage = Usd.Stage.Open(str(main))
-        assert has(run_check(stage, PathConventionCheck), "1.2.4")
+        assert has(run_validators(stage, "rep0158:PathConvention"), "1.2.4")
 
     def test_relative_path_in_reference_no_violation(self, tmp_path):
         target = tmp_path / "geo.usda"
@@ -144,10 +131,8 @@ def Xform "Robot" (
     references = @./geo.usda@
 ) {}
 """)
-        from pxr import Usd
-
         stage = Usd.Stage.Open(str(main))
-        assert none_with(run_check(stage, PathConventionCheck), "1.2.4")
+        assert none_with(run_validators(stage, "rep0158:PathConvention"), "1.2.4")
 
     def test_omniverse_uri_gives_error(self, tmp_path):
         main = tmp_path / "main.usda"
@@ -156,10 +141,8 @@ def Xform "Robot" (
     references = @omniverse://my-server/asset.usd@
 ) {}
 """)
-        from pxr import Usd
-
         stage = Usd.Stage.Open(str(main))
-        assert has(run_check(stage, PathConventionCheck), "1.2.4")
+        assert has(run_validators(stage, "rep0158:PathConvention"), "1.2.4")
 
     def test_custom_prefab_path_attribute_gives_error(self):
         stage = make_stage("""
@@ -168,7 +151,7 @@ def Xform "Robot" {
     custom string mysim:prefabPath = "robot_model.usd"
 }
 """)
-        assert has(run_check(stage, PathConventionCheck), "1.2.9")
+        assert has(run_validators(stage, "rep0158:PathConvention"), "1.2.9")
 
     def test_custom_asset_ref_attribute_gives_error(self):
         stage = make_stage("""
@@ -177,7 +160,7 @@ def Xform "Robot" {
     custom string vendor:assetRef = "model.usda"
 }
 """)
-        assert has(run_check(stage, PathConventionCheck), "1.2.9")
+        assert has(run_validators(stage, "rep0158:PathConvention"), "1.2.9")
 
     def test_regular_custom_string_attribute_no_violation(self):
         """A custom string attribute that does not suggest dynamic loading is fine."""
@@ -187,7 +170,7 @@ def Xform "Robot" {
     custom string robot:description = "A simple robot arm"
 }
 """)
-        assert none_with(run_check(stage, PathConventionCheck), "1.2.9")
+        assert none_with(run_validators(stage, "rep0158:PathConvention"), "1.2.9")
 
 
 # ------------------------------------------------------------------ #
@@ -207,7 +190,7 @@ def Xform "Robot" (
     ) {}
 }
 """)
-        assert has(run_check(stage, CompositionModelCheck), "1.2.6")
+        assert has(run_validators(stage, "rep0158:CompositionModel"), "1.2.6")
 
     def test_component_inside_assembly_no_violation(self):
         stage = make_stage("""
@@ -220,7 +203,7 @@ def Xform "Scene" (
     ) {}
 }
 """)
-        assert none_with(run_check(stage, CompositionModelCheck), "1.2.6")
+        assert none_with(run_validators(stage, "rep0158:CompositionModel"), "1.2.6")
 
     def test_subcomponent_inside_component_no_violation(self):
         stage = make_stage("""
@@ -233,7 +216,7 @@ def Xform "Robot" (
     ) {}
 }
 """)
-        assert none_with(run_check(stage, CompositionModelCheck), "1.2.6")
+        assert none_with(run_validators(stage, "rep0158:CompositionModel"), "1.2.6")
 
     def test_deeply_nested_component_gives_warning(self):
         """A component two levels deep inside another component is still a violation."""
@@ -251,7 +234,7 @@ def Xform "Robot" (
     }
 }
 """)
-        assert has(run_check(stage, CompositionModelCheck), "1.2.6")
+        assert has(run_validators(stage, "rep0158:CompositionModel"), "1.2.6")
 
 
 # ------------------------------------------------------------------ #
@@ -272,7 +255,7 @@ def Xform "Robot" (
     }
 }
 """)
-        assert has(run_check(stage, VariantDefaultCheck), "1.2.7")
+        assert has(run_validators(stage, "rep0158:VariantDefault"), "1.2.7")
 
     def test_variant_set_with_selection_no_violation(self):
         stage = make_stage("""
@@ -291,7 +274,7 @@ def Xform "Robot" (
     }
 }
 """)
-        assert none_with(run_check(stage, VariantDefaultCheck), "1.2.7")
+        assert none_with(run_validators(stage, "rep0158:VariantDefault"), "1.2.7")
 
 
 # ------------------------------------------------------------------ #
@@ -309,7 +292,7 @@ def Xform "Robot" (
     inherits = </BaseRobot>
 ) {}
 """)
-        assert has(run_check(stage, InheritsSpecializesCheck), "1.2.8")
+        assert has(run_validators(stage, "rep0158:InheritsSpecializes"), "1.2.8")
 
     def test_specializes_arc_gives_warning(self):
         stage = make_stage("""
@@ -320,14 +303,14 @@ def Xform "Robot" (
     specializes = </BaseRobot>
 ) {}
 """)
-        assert has(run_check(stage, InheritsSpecializesCheck), "1.2.8")
+        assert has(run_validators(stage, "rep0158:InheritsSpecializes"), "1.2.8")
 
     def test_no_arcs_no_violation(self):
         stage = make_stage("""
 #usda 1.0
 def Xform "Robot" {}
 """)
-        assert none_with(run_check(stage, InheritsSpecializesCheck), "1.2.8")
+        assert none_with(run_validators(stage, "rep0158:InheritsSpecializes"), "1.2.8")
 
 
 # ------------------------------------------------------------------ #
@@ -344,7 +327,7 @@ def Xform "Robot" (
     prepend apiSchemas = ["PhysicsRigidBodyAPI"]
 ) {}
 """)
-        assert has(run_check(stage, PayloadKinematicTopologyCheck), "1.2.10")
+        assert has(run_validators(stage, "rep0158:PayloadKinematicTopology"), "1.2.10")
 
     def test_payload_root_with_ros_context_gives_error(self):
         stage = make_stage("""
@@ -356,7 +339,7 @@ def Xform "Robot" (
     string ros:context:namespace = "robot_1"
 }
 """)
-        assert has(run_check(stage, PayloadKinematicTopologyCheck), "1.2.10")
+        assert has(run_validators(stage, "rep0158:PayloadKinematicTopology"), "1.2.10")
 
     def test_non_payload_rigid_body_no_violation(self):
         stage = make_stage("""
@@ -365,7 +348,7 @@ def Xform "Robot" (
     prepend apiSchemas = ["PhysicsRigidBodyAPI"]
 ) {}
 """)
-        assert none_with(run_check(stage, PayloadKinematicTopologyCheck), "1.2.10")
+        assert none_with(run_validators(stage, "rep0158:PayloadKinematicTopology"), "1.2.10")
 
 
 # ------------------------------------------------------------------ #
@@ -389,7 +372,7 @@ def Scope "Prototypes" {
     ) {}
 }
 """)
-        assert has(run_check(stage, ParallelSimulationInstancingCheck), "1.2.11")
+        assert has(run_validators(stage, "rep0158:ParallelSimulationInstancing"), "1.2.11")
 
     def test_point_instancer_with_visual_only_prototype_no_violation(self):
         stage = make_stage("""
@@ -408,7 +391,7 @@ def Scope "Prototypes" {
     }
 }
 """)
-        assert none_with(run_check(stage, ParallelSimulationInstancingCheck), "1.2.11")
+        assert none_with(run_validators(stage, "rep0158:ParallelSimulationInstancing"), "1.2.11")
 
 
 # ------------------------------------------------------------------ #
@@ -432,7 +415,7 @@ def Xform "Robot" (
     prepend apiSchemas = ["PhysicsRigidBodyAPI"]
 ) {}
 """)
-        v = run_check(stage, LayerEncodingCheck)
+        v = run_validators(stage, "rep0158:LayerEncoding")
         assert none_with(v, "1.2.12")
         assert none_with(v, "1.2.13")
 
@@ -448,7 +431,7 @@ def Xform "Robot" (
         layer.Save()
 
         stage = Usd.Stage.Open(usdc_path)
-        v = run_check(stage, LayerEncodingCheck)
+        v = run_validators(stage, "rep0158:LayerEncoding")
         assert has(v, "1.2.12")
 
     def test_usda_layer_with_api_schemas_no_violation(self, tmp_path):
@@ -463,7 +446,7 @@ def Xform "RosInterface" (
 """,
         )
         stage = Usd.Stage.Open(usda_path)
-        assert none_with(run_check(stage, LayerEncodingCheck), "1.2.12")
+        assert none_with(run_validators(stage, "rep0158:LayerEncoding"), "1.2.12")
 
     def test_usda_layer_with_heavy_geometry_gives_warning(self, tmp_path):
         """A .usda layer containing large mesh data should warn (use .usdc instead)."""
@@ -482,7 +465,7 @@ def Mesh "BigMesh" {{
 """,
         )
         stage = Usd.Stage.Open(usda_path)
-        assert has(run_check(stage, LayerEncodingCheck), "1.2.13")
+        assert has(run_validators(stage, "rep0158:LayerEncoding"), "1.2.13")
 
     def test_usdc_layer_with_only_geometry_no_schema_warning(self, tmp_path):
         """A .usdc layer with pure geometry (no schemas) should not trigger 1.2.12."""
@@ -500,4 +483,4 @@ def Mesh "BigMesh" {{
         layer.Save()
 
         stage = Usd.Stage.Open(usdc_path)
-        assert none_with(run_check(stage, LayerEncodingCheck), "1.2.12")
+        assert none_with(run_validators(stage, "rep0158:LayerEncoding"), "1.2.12")

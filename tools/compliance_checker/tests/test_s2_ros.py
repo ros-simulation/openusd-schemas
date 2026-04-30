@@ -27,20 +27,8 @@ Check IDs covered:
 """
 
 import pytest
-from compliance_checker.checks.s2_ros import (
-    CameraOpticalFrameCheck,
-    RosActionCheck,
-    RosContextPlacementCheck,
-    RosFrameAPICheck,
-    RosFrameAttributesCheck,
-    RosInterfacePlacementCheck,
-    RosInterfaceStructureCheck,
-    RosJointNameCheck,
-    RosServiceCheck,
-    RosTopicCheck,
-)
 
-from .conftest import has, make_stage, none_with, run_check
+from .conftest import has, make_stage, none_with, run_validators
 
 # ------------------------------------------------------------------ #
 # Helpers for building common USDA fragments                           #
@@ -85,7 +73,7 @@ def Xform "Robot" (
     }
 }
 """)
-        assert has(run_check(stage, RosContextPlacementCheck), "2.1.1")
+        assert has(run_validators(stage, "rep0158:RosContextPlacement"), "2.1.1")
 
     def test_context_outside_payload_no_violation(self):
         stage = make_stage("""
@@ -96,7 +84,7 @@ def Xform "Robot" (
     string ros:context:namespace = "my_robot"
 }
 """)
-        assert none_with(run_check(stage, RosContextPlacementCheck), "2.1.1")
+        assert none_with(run_validators(stage, "rep0158:RosContextPlacement"), "2.1.1")
 
     def test_nested_context_with_parent_frame_gives_warning(self):
         stage = make_stage("""
@@ -114,7 +102,7 @@ def Xform "Robot" (
     }
 }
 """)
-        assert has(run_check(stage, RosContextPlacementCheck), "2.1.2")
+        assert has(run_validators(stage, "rep0158:RosContextPlacement"), "2.1.2")
 
     def test_outermost_context_with_parent_frame_no_violation(self):
         stage = make_stage("""
@@ -126,7 +114,7 @@ def Xform "Robot" (
     string ros:context:parent_frame = "world"
 }
 """)
-        assert none_with(run_check(stage, RosContextPlacementCheck), "2.1.2")
+        assert none_with(run_validators(stage, "rep0158:RosContextPlacement"), "2.1.2")
 
     def test_invalid_namespace_with_runtime_substitution_gives_error(self):
         stage = make_stage("""
@@ -137,7 +125,7 @@ def Xform "Robot" (
     string ros:context:namespace = "robot_{id}"
 }
 """)
-        assert has(run_check(stage, RosContextPlacementCheck), "2.1.3")
+        assert has(run_validators(stage, "rep0158:RosContextPlacement"), "2.1.3")
 
     def test_absolute_namespace_is_allowed(self):
         stage = make_stage("""
@@ -148,7 +136,7 @@ def Xform "Robot" (
     string ros:context:namespace = "/robot_1"
 }
 """)
-        assert none_with(run_check(stage, RosContextPlacementCheck), "2.1.3")
+        assert none_with(run_validators(stage, "rep0158:RosContextPlacement"), "2.1.3")
 
 
 # ------------------------------------------------------------------ #
@@ -170,7 +158,7 @@ def Xform "Robot" (
     }}
 }}
 """)
-        assert has(run_check(stage, RosInterfacePlacementCheck), "2.2.1")
+        assert has(run_validators(stage, "rep0158:RosInterfacePlacement"), "2.2.1")
 
     def test_service_inside_payload_gives_error(self):
         stage = make_stage(f"""
@@ -185,7 +173,7 @@ def Xform "Robot" (
     }}
 }}
 """)
-        assert has(run_check(stage, RosInterfacePlacementCheck), "2.2.1")
+        assert has(run_validators(stage, "rep0158:RosInterfacePlacement"), "2.2.1")
 
     def test_interface_outside_payload_no_violation(self):
         stage = make_stage(f"""
@@ -198,7 +186,7 @@ def Xform "Robot" {{
     }}
 }}
 """)
-        assert none_with(run_check(stage, RosInterfacePlacementCheck), "2.2.1")
+        assert none_with(run_validators(stage, "rep0158:RosInterfacePlacement"), "2.2.1")
 
 
 # ------------------------------------------------------------------ #
@@ -216,7 +204,7 @@ def Xform "link" (
     {_FULL_TOPIC}
 }}
 """)
-        assert has(run_check(stage, RosInterfaceStructureCheck), "2.2.2")
+        assert has(run_validators(stage, "rep0158:RosInterfaceStructure"), "2.2.2")
 
     def test_multiple_interfaces_on_single_prim_gives_error(self):
         stage = make_stage(f"""
@@ -228,7 +216,7 @@ def Xform "iface" (
     {_FULL_SERVICE}
 }}
 """)
-        assert has(run_check(stage, RosInterfaceStructureCheck), "2.2.3")
+        assert has(run_validators(stage, "rep0158:RosInterfaceStructure"), "2.2.3")
 
     def test_sensor_interface_not_direct_child_of_link_gives_warning(self):
         stage = make_stage(f"""
@@ -245,7 +233,7 @@ def Xform "link" (
     }}
 }}
 """)
-        assert has(run_check(stage, RosInterfaceStructureCheck), "2.2.4")
+        assert has(run_validators(stage, "rep0158:RosInterfaceStructure"), "2.2.4")
 
     def test_sensor_interface_direct_child_xform_no_violation(self):
         stage = make_stage(f"""
@@ -260,9 +248,10 @@ def Xform "link" (
     }}
 }}
 """)
-        assert none_with(run_check(stage, RosInterfaceStructureCheck), "2.2.2")
-        assert none_with(run_check(stage, RosInterfaceStructureCheck), "2.2.3")
-        assert none_with(run_check(stage, RosInterfaceStructureCheck), "2.2.4")
+        errors = run_validators(stage, "rep0158:RosInterfaceStructure")
+        assert none_with(errors, "2.2.2")
+        assert none_with(errors, "2.2.3")
+        assert none_with(errors, "2.2.4")
 
 
 # ------------------------------------------------------------------ #
@@ -292,7 +281,7 @@ def Xform "T" (
     double ros:topic:publish_rate = 1.0
 }}
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.3.1")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.3.1")
 
     @pytest.mark.parametrize(
         "good_name",
@@ -315,7 +304,7 @@ def Xform "T" (
     double ros:topic:publish_rate = 1.0
 }}
 """)
-        assert none_with(run_check(stage, RosTopicCheck), "2.3.1")
+        assert none_with(run_validators(stage, "rep0158:RosTopic"), "2.3.1")
 
 
 # ------------------------------------------------------------------ #
@@ -335,7 +324,7 @@ def Xform "T" (
     double ros:topic:publish_rate = 10.0
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.1")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.1")
 
     def test_invalid_role_gives_error(self):
         stage = make_stage("""
@@ -349,7 +338,7 @@ def Xform "T" (
     double ros:topic:publish_rate = 10.0
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.1")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.1")
 
     def test_missing_name_gives_error(self):
         stage = make_stage("""
@@ -362,7 +351,7 @@ def Xform "T" (
     double ros:topic:publish_rate = 10.0
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.2")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.2")
 
     def test_missing_type_gives_error(self):
         stage = make_stage("""
@@ -375,7 +364,7 @@ def Xform "T" (
     double ros:topic:publish_rate = 10.0
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.3")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.3")
 
     def test_publisher_missing_rate_gives_error(self):
         stage = make_stage("""
@@ -388,7 +377,7 @@ def Xform "T" (
     string ros:topic:type = "sensor_msgs/msg/JointState"
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.4")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.4")
 
     def test_subscription_without_rate_no_violation(self):
         """Subscriptions do not require publish_rate (§2.4)."""
@@ -402,7 +391,7 @@ def Xform "T" (
     string ros:topic:type = "geometry_msgs/msg/Twist"
 }
 """)
-        assert none_with(run_check(stage, RosTopicCheck), "2.4.4")
+        assert none_with(run_validators(stage, "rep0158:RosTopic"), "2.4.4")
 
     def test_complete_topic_no_violation(self):
         stage = make_stage(f"""
@@ -413,7 +402,7 @@ def Xform "T" (
     {_FULL_TOPIC}
 }}
 """)
-        v = run_check(stage, RosTopicCheck)
+        v = run_validators(stage, "rep0158:RosTopic")
         for cid in (
             "2.4.1",
             "2.4.2",
@@ -446,7 +435,7 @@ def Xform "T" (
     token {attr} = "{value}"
 }}
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.5")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.5")
 
     @pytest.mark.parametrize(
         "attr,value",
@@ -466,7 +455,7 @@ def Xform "T" (
     token {attr} = "{value}"
 }}
 """)
-        assert none_with(run_check(stage, RosTopicCheck), "2.4.5")
+        assert none_with(run_validators(stage, "rep0158:RosTopic"), "2.4.5")
 
     def test_topic_starts_enabled_bool_no_violation(self):
         stage = make_stage(f"""
@@ -478,7 +467,7 @@ def Xform "T" (
     bool ros:topic:starts_enabled = false
 }}
 """)
-        assert none_with(run_check(stage, RosTopicCheck), "2.4.6")
+        assert none_with(run_validators(stage, "rep0158:RosTopic"), "2.4.6")
 
     def test_topic_starts_enabled_wrong_type_gives_error(self):
         stage = make_stage(f"""
@@ -490,7 +479,7 @@ def Xform "T" (
     string ros:topic:starts_enabled = "nope"
 }}
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.6")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.6")
 
     def test_topic_override_frame_id_valid_name_no_violation(self):
         stage = make_stage(f"""
@@ -502,7 +491,7 @@ def Xform "T" (
     string ros:topic:override_frame_id = "map"
 }}
 """)
-        assert none_with(run_check(stage, RosTopicCheck), "2.4.7")
+        assert none_with(run_validators(stage, "rep0158:RosTopic"), "2.4.7")
 
     def test_topic_override_frame_id_invalid_name_gives_warning(self):
         stage = make_stage(f"""
@@ -514,7 +503,7 @@ def Xform "T" (
     string ros:topic:override_frame_id = "bad frame"
 }}
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.7")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.7")
 
     def test_qos_match_publisher_true_on_publisher_gives_warning(self):
         stage = make_stage("""
@@ -529,7 +518,7 @@ def Xform "T" (
     bool ros:topic:qos:match_publisher = true
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.8")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.8")
 
     def test_qos_depth_zero_with_keep_last_gives_error(self):
         stage = make_stage("""
@@ -545,7 +534,7 @@ def Xform "T" (
     int ros:topic:qos:depth = 0
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.4.9")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.4.9")
 
     def test_qos_depth_positive_with_keep_last_no_violation(self):
         stage = make_stage("""
@@ -561,7 +550,7 @@ def Xform "T" (
     int ros:topic:qos:depth = 10
 }
 """)
-        assert none_with(run_check(stage, RosTopicCheck), "2.4.9")
+        assert none_with(run_validators(stage, "rep0158:RosTopic"), "2.4.9")
 
 
 # ------------------------------------------------------------------ #
@@ -582,7 +571,7 @@ def Xform "Clock" (
     double ros:topic:publish_rate = 100.0
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.9.1")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.9.1")
 
     def test_simulation_interfaces_type_gives_error(self):
         stage = make_stage("""
@@ -595,7 +584,7 @@ def Xform "Spawn" (
     string ros:service:type = "simulation_interfaces/srv/SpawnEntity"
 }
 """)
-        assert has(run_check(stage, RosServiceCheck), "2.9.2")
+        assert has(run_validators(stage, "rep0158:RosService"), "2.9.2")
 
     def test_rosgraph_clock_type_gives_error(self):
         stage = make_stage("""
@@ -609,7 +598,7 @@ def Xform "T" (
     double ros:topic:publish_rate = 100.0
 }
 """)
-        assert has(run_check(stage, RosTopicCheck), "2.9.2")
+        assert has(run_validators(stage, "rep0158:RosTopic"), "2.9.2")
 
 
 # ------------------------------------------------------------------ #
@@ -627,7 +616,7 @@ def Xform "Svc" (
     {_FULL_SERVICE}
 }}
 """)
-        v = run_check(stage, RosServiceCheck)
+        v = run_validators(stage, "rep0158:RosService")
         for cid in ("2.5.1", "2.5.2", "2.3.1"):
             assert none_with(v, cid), f"Unexpected violation {cid}"
 
@@ -641,7 +630,7 @@ def Xform "Svc" (
     string ros:service:type = "std_srvs/srv/SetBool"
 }
 """)
-        assert has(run_check(stage, RosServiceCheck), "2.5.1")
+        assert has(run_validators(stage, "rep0158:RosService"), "2.5.1")
 
     def test_missing_service_name_gives_error(self):
         stage = make_stage("""
@@ -653,7 +642,7 @@ def Xform "Svc" (
     string ros:service:type = "std_srvs/srv/SetBool"
 }
 """)
-        assert has(run_check(stage, RosServiceCheck), "2.5.1")
+        assert has(run_validators(stage, "rep0158:RosService"), "2.5.1")
 
     def test_invalid_service_name_gives_naming_error(self):
         stage = make_stage("""
@@ -666,7 +655,7 @@ def Xform "Svc" (
     string ros:service:type = "std_srvs/srv/SetBool"
 }
 """)
-        assert has(run_check(stage, RosServiceCheck), "2.3.1")
+        assert has(run_validators(stage, "rep0158:RosService"), "2.3.1")
 
     def test_service_starts_enabled_bool_no_violation(self):
         stage = make_stage("""
@@ -680,7 +669,7 @@ def Xform "Svc" (
     bool ros:service:starts_enabled = false
 }
 """)
-        assert none_with(run_check(stage, RosServiceCheck), "2.5.2")
+        assert none_with(run_validators(stage, "rep0158:RosService"), "2.5.2")
 
     def test_service_starts_enabled_wrong_type_gives_error(self):
         stage = make_stage("""
@@ -694,7 +683,7 @@ def Xform "Svc" (
     string ros:service:starts_enabled = "false"
 }
 """)
-        assert has(run_check(stage, RosServiceCheck), "2.5.2")
+        assert has(run_validators(stage, "rep0158:RosService"), "2.5.2")
 
 
 # ------------------------------------------------------------------ #
@@ -712,7 +701,7 @@ def Xform "Act" (
     {_FULL_ACTION}
 }}
 """)
-        v = run_check(stage, RosActionCheck)
+        v = run_validators(stage, "rep0158:RosAction")
         for cid in ("2.6.1", "2.6.2", "2.3.1"):
             assert none_with(v, cid), f"Unexpected violation {cid}"
 
@@ -726,7 +715,7 @@ def Xform "Act" (
     string ros:action:name = "follow_trajectory"
 }
 """)
-        assert has(run_check(stage, RosActionCheck), "2.6.1")
+        assert has(run_validators(stage, "rep0158:RosAction"), "2.6.1")
 
     def test_invalid_action_role_gives_error(self):
         stage = make_stage("""
@@ -739,7 +728,7 @@ def Xform "Act" (
     string ros:action:type = "control_msgs/action/FollowJointTrajectory"
 }
 """)
-        assert has(run_check(stage, RosActionCheck), "2.6.1")
+        assert has(run_validators(stage, "rep0158:RosAction"), "2.6.1")
 
     def test_action_starts_enabled_bool_no_violation(self):
         stage = make_stage("""
@@ -753,7 +742,7 @@ def Xform "Act" (
     bool ros:action:starts_enabled = false
 }
 """)
-        assert none_with(run_check(stage, RosActionCheck), "2.6.2")
+        assert none_with(run_validators(stage, "rep0158:RosAction"), "2.6.2")
 
     def test_action_starts_enabled_wrong_type_gives_error(self):
         stage = make_stage("""
@@ -767,7 +756,7 @@ def Xform "Act" (
     token ros:action:starts_enabled = "false"
 }
 """)
-        assert has(run_check(stage, RosActionCheck), "2.6.2")
+        assert has(run_validators(stage, "rep0158:RosAction"), "2.6.2")
 
 
 # ------------------------------------------------------------------ #
@@ -783,7 +772,7 @@ def Xform "Link" (
     prepend apiSchemas = ["PhysicsRigidBodyAPI", "RosFrameAPI"]
 ) {}
 """)
-        assert has(run_check(stage, RosFrameAPICheck), "2.7.1")
+        assert has(run_validators(stage, "rep0158:RosFrameAPI"), "2.7.1")
 
     def test_frame_api_without_rigid_body_no_violation(self):
         stage = make_stage("""
@@ -792,7 +781,7 @@ def Xform "camera_optical_frame" (
     prepend apiSchemas = ["RosFrameAPI"]
 ) {}
 """)
-        assert none_with(run_check(stage, RosFrameAPICheck), "2.7.1")
+        assert none_with(run_validators(stage, "rep0158:RosFrameAPI"), "2.7.1")
 
 
 class TestRosFrameAttributes:
@@ -805,7 +794,7 @@ def Xform "frame" (
     string ros:frame:id = "bad frame"
 }
 """)
-        assert has(run_check(stage, RosFrameAttributesCheck), "2.7.2")
+        assert has(run_validators(stage, "rep0158:RosFrameAttributes"), "2.7.2")
 
     def test_non_bool_frame_static_gives_error(self):
         stage = make_stage("""
@@ -816,7 +805,7 @@ def Xform "frame" (
     token ros:frame:static = "true"
 }
 """)
-        assert has(run_check(stage, RosFrameAttributesCheck), "2.7.3")
+        assert has(run_validators(stage, "rep0158:RosFrameAttributes"), "2.7.3")
 
     def test_valid_frame_attributes_no_violation(self):
         stage = make_stage("""
@@ -828,8 +817,9 @@ def Xform "frame" (
     bool ros:frame:static = true
 }
 """)
-        assert none_with(run_check(stage, RosFrameAttributesCheck), "2.7.2")
-        assert none_with(run_check(stage, RosFrameAttributesCheck), "2.7.3")
+        errors = run_validators(stage, "rep0158:RosFrameAttributes")
+        assert none_with(errors, "2.7.2")
+        assert none_with(errors, "2.7.3")
 
 
 # ------------------------------------------------------------------ #
@@ -847,7 +837,7 @@ def Camera "rgb_camera" (
     {_FULL_TOPIC}
 }}
 """)
-        assert has(run_check(stage, CameraOpticalFrameCheck), "2.8.1")
+        assert has(run_validators(stage, "rep0158:CameraOpticalFrame"), "2.8.1")
 
     def test_topic_on_child_with_rotation_no_violation(self):
         stage = make_stage(f"""
@@ -862,7 +852,7 @@ def Camera "rgb_camera" {{
     }}
 }}
 """)
-        assert none_with(run_check(stage, CameraOpticalFrameCheck), "2.8.1")
+        assert none_with(run_validators(stage, "rep0158:CameraOpticalFrame"), "2.8.1")
 
     def test_topic_on_child_without_rotation_gives_warning(self):
         stage = make_stage(f"""
@@ -875,7 +865,7 @@ def Camera "rgb_camera" {{
     }}
 }}
 """)
-        assert has(run_check(stage, CameraOpticalFrameCheck), "2.8.1")
+        assert has(run_validators(stage, "rep0158:CameraOpticalFrame"), "2.8.1")
 
     def test_camera_without_ros_interface_no_violation(self):
         """A Camera prim with no ROS schemas is not flagged."""
@@ -883,7 +873,7 @@ def Camera "rgb_camera" {{
 #usda 1.0
 def Camera "rgb_camera" {}
 """)
-        assert none_with(run_check(stage, CameraOpticalFrameCheck), "2.8.1")
+        assert none_with(run_validators(stage, "rep0158:CameraOpticalFrame"), "2.8.1")
 
 
 # ------------------------------------------------------------------ #
@@ -900,7 +890,7 @@ def PhysicsRevoluteJoint "shoulder_pan_joint" {
     float physics:upperLimit = 3.14
 }
 """)
-        assert has(run_check(stage, RosJointNameCheck), "2.10.1")
+        assert has(run_validators(stage, "rep0158:RosJointName"), "2.10.1")
 
     def test_revolute_joint_with_ros_name_no_violation(self):
         stage = make_stage("""
@@ -911,14 +901,14 @@ def PhysicsRevoluteJoint "shoulder_pan_joint" {
     custom string ros:joint:name = "shoulder_pan_joint"
 }
 """)
-        assert none_with(run_check(stage, RosJointNameCheck), "2.10.1")
+        assert none_with(run_validators(stage, "rep0158:RosJointName"), "2.10.1")
 
     def test_fixed_joint_without_ros_name_gives_warning(self):
         stage = make_stage("""
 #usda 1.0
 def PhysicsFixedJoint "world_fixed" {}
 """)
-        assert has(run_check(stage, RosJointNameCheck), "2.10.1")
+        assert has(run_validators(stage, "rep0158:RosJointName"), "2.10.1")
 
     def test_prismatic_joint_with_ros_name_no_violation(self):
         stage = make_stage("""
@@ -929,7 +919,7 @@ def PhysicsPrismaticJoint "slide" {
     custom string ros:joint:name = "linear_actuator"
 }
 """)
-        assert none_with(run_check(stage, RosJointNameCheck), "2.10.1")
+        assert none_with(run_validators(stage, "rep0158:RosJointName"), "2.10.1")
 
     def test_non_joint_prim_not_flagged(self):
         """A plain Xform is not a joint and must never trigger 2.10.1."""
@@ -937,4 +927,4 @@ def PhysicsPrismaticJoint "slide" {
 #usda 1.0
 def Xform "link" {}
 """)
-        assert none_with(run_check(stage, RosJointNameCheck), "2.10.1")
+        assert none_with(run_validators(stage, "rep0158:RosJointName"), "2.10.1")

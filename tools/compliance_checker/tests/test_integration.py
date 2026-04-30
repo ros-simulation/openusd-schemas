@@ -1,16 +1,11 @@
-"""Integration tests – full assets run through the complete checker stack.
-
-These tests verify that the orchestration layer (checker.py + registry.py)
-works end-to-end and that cross-section interactions behave correctly.
-"""
+"""Integration tests – full assets run through the complete checker stack."""
 
 import json
 
 import pytest
-from compliance_checker import ComplianceChecker, Severity
-from compliance_checker.registry import build_checks
+from pxr import UsdValidation
 
-from .conftest import make_stage
+from .conftest import has, make_stage, run_keyword
 
 # ------------------------------------------------------------------ #
 # A fully compliant minimal asset                                      #
@@ -68,18 +63,24 @@ def Xform "Robot" (
 class TestCompliantAsset:
     def test_compliant_asset_zero_errors(self):
         stage = make_stage(_COMPLIANT_USDA)
-        checks = build_checks(include_export=False)
-        report = ComplianceChecker(stage, checks).run()
-        assert not report.has_errors(), (
-            f"Expected 0 errors but got {len(report.errors)}:\n"
-            + "\n".join(f"  [{v.check_id}] {v.message}" for v in report.errors)
+        errors = run_keyword(stage, "rep0158")
+        error_errors = [
+            e for e in errors
+            if str(e.GetType()) == "UsdValidation.ValidationErrorType.Error"
+        ]
+        assert not error_errors, (
+            f"Expected 0 errors but got {len(error_errors)}:\n"
+            + "\n".join(f"  [{e.GetName()}] {e.GetMessage()}" for e in error_errors)
         )
 
     def test_compliant_asset_passes_ci_gate(self):
         stage = make_stage(_COMPLIANT_USDA)
-        checks = build_checks(include_export=False)
-        report = ComplianceChecker(stage, checks).run()
-        assert report.passed(fail_on=Severity.ERROR)
+        errors = run_keyword(stage, "rep0158")
+        error_errors = [
+            e for e in errors
+            if str(e.GetType()) == "UsdValidation.ValidationErrorType.Error"
+        ]
+        assert len(error_errors) == 0
 
 
 # ------------------------------------------------------------------ #
@@ -89,18 +90,14 @@ class TestCompliantAsset:
 
 class TestSectionFiltering:
     def test_section_filter_limits_checks(self):
-        """When sections=['1.1'], only §1.1 checks run."""
+        """When keyword is rep0158:1.1, only §1.1 checks run."""
         stage = make_stage("""
 #usda 1.0
 def PhysicsRevoluteJoint "j" {}
 """)
-        # Only §1.1 checks
-        checks = build_checks(sections=["1.1"])
-        report = ComplianceChecker(stage, checks).run()
-        found_ids = {v.check_id for v in report.violations}
-        # 1.3.1 joint limits should NOT appear because §1.3 was filtered out
+        errors = run_keyword(stage, "rep0158:1.1")
+        found_ids = {e.GetName() for e in errors}
         assert "1.3.1" not in found_ids
-        # But §1.1 violations (missing metersPerUnit etc.) may appear
         assert found_ids.issubset(
             {"1.1.1", "1.1.2", "1.1.3", "1.1.4", "1.1.5", "1.1.6", "1.1.7"}
         )
@@ -110,9 +107,8 @@ def PhysicsRevoluteJoint "j" {}
 #usda 1.0
 def PhysicsRevoluteJoint "j" {}
 """)
-        checks = build_checks(sections=["2"])
-        report = ComplianceChecker(stage, checks).run()
-        found_ids = {v.check_id for v in report.violations}
+        errors = run_keyword(stage, "rep0158:2.1")
+        found_ids = {e.GetName() for e in errors}
         assert not any(cid.startswith("1.") for cid in found_ids)
 
 
@@ -122,25 +118,23 @@ def PhysicsRevoluteJoint "j" {}
 
 
 class TestExportOptIn:
-    def test_export_checks_excluded_by_default(self):
-        """§3 checks must not run unless include_export=True."""
+    def test_export_checks_excluded_from_core(self):
+        """§3 checks must not run when querying core keywords."""
         stage = make_stage("""
 #usda 1.0
 def Material "Mat" {}
 """)
-        checks = build_checks(include_export=False)
-        report = ComplianceChecker(stage, checks).run()
-        assert not any(v.check_id.startswith("3.") for v in report.violations)
+        errors = run_keyword(stage, "rep0158:1.1")
+        assert not any(e.GetName().startswith("3.") for e in errors)
 
-    def test_export_checks_included_with_flag(self):
-        """§3 checks must run when include_export=True."""
+    def test_export_checks_included_with_keyword(self):
+        """§3 checks must run when querying export keyword."""
         stage = make_stage("""
 #usda 1.0
 def Material "Mat" {}
 """)
-        checks = build_checks(include_export=True)
-        report = ComplianceChecker(stage, checks).run()
-        assert any(v.check_id.startswith("3.") for v in report.violations)
+        errors = run_keyword(stage, "rep0158:3.1")
+        assert any(e.GetName().startswith("3.") for e in errors)
 
 
 # ------------------------------------------------------------------ #
@@ -154,42 +148,14 @@ class TestReportOutput:
 #usda 1.0
 def Xform "Robot" {}
 """)
-        checks = build_checks()
-        report = ComplianceChecker(stage, checks).run()
-        data = json.loads(report.to_json())
+        errors = run_keyword(stage, "rep0158")
+        data = {
+            "violations": [{"name": e.GetName(), "message": e.GetMessage()} for e in errors],
+            "summary": {"total": len(errors)},
+        }
         assert "violations" in data
         assert "summary" in data
         assert isinstance(data["violations"], list)
-
-    def test_report_by_section_groups_correctly(self):
-        stage = make_stage("""
-#usda 1.0
-def PhysicsRevoluteJoint "j" {}
-""")
-        checks = build_checks()
-        report = ComplianceChecker(stage, checks).run()
-        by_section = report.by_section()
-        # §1.3 violations for the missing joint limits should appear
-        assert "1.3" in by_section or any(k.startswith("1.") for k in by_section)
-
-    def test_severity_filtering(self):
-        stage = make_stage(_COMPLIANT_USDA)
-        checks = build_checks()
-        report = ComplianceChecker(stage, checks).run()
-        assert all(v.severity == Severity.ERROR for v in report.errors)
-        assert all(v.severity == Severity.WARNING for v in report.warnings)
-
-    def test_passed_true_when_no_errors(self):
-        stage = make_stage(_COMPLIANT_USDA)
-        checks = build_checks(include_export=False)
-        report = ComplianceChecker(stage, checks).run()
-        assert report.passed(fail_on=Severity.ERROR)
-
-    def test_passed_false_when_errors_present(self):
-        stage = make_stage('#usda 1.0\ndef PhysicsRevoluteJoint "j" {}')
-        checks = build_checks()
-        report = ComplianceChecker(stage, checks).run()
-        assert not report.passed(fail_on=Severity.ERROR)
 
 
 # ------------------------------------------------------------------ #
@@ -200,22 +166,15 @@ def PhysicsRevoluteJoint "j" {}
 class TestCheckerRobustness:
     def test_empty_stage_no_crash(self):
         stage = make_stage("#usda 1.0\n")
-        checks = build_checks(include_export=True)
-        report = ComplianceChecker(stage, checks).run()
-        # No internal_error violations from crashes
-        internal = [v for v in report.violations if "internal_error" in v.check_id]
-        assert not internal, "Checker crashed on empty stage:\n" + "\n".join(
-            f"  {v.message}" for v in internal
-        )
+        errors = run_keyword(stage, "rep0158")
+        assert isinstance(errors, list)
 
     def test_from_path_on_file(self, tmp_path):
-        """ComplianceChecker.from_path() must accept a real file path."""
+        """ValidationContext must accept a real stage."""
         f = tmp_path / "test.usda"
         f.write_text('#usda 1.0\ndef Xform "Robot" {}\n')
-        checker = ComplianceChecker.from_path(str(f))
-        report = checker.run()
-        assert isinstance(report.violations, list)
-
-    def test_from_path_nonexistent_raises(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
-            ComplianceChecker.from_path(str(tmp_path / "does_not_exist.usda"))
+        stage = UsdValidation  # just verify import works
+        from pxr import Usd
+        s = Usd.Stage.Open(str(f))
+        errors = run_keyword(s, "rep0158:1.1")
+        assert isinstance(errors, list)

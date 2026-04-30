@@ -12,15 +12,8 @@ Check IDs covered:
 """
 
 import pytest
-from compliance_checker.checks.s3_export import (
-    GeometryConstraintsCheck,
-    LightingPortabilityCheck,
-    MaterialPortabilityCheck,
-    TextureBakingCheck,
-    TextureFormatCheck,
-)
 
-from .conftest import has, make_stage, none_with, run_check
+from .conftest import has, make_stage, none_with, run_validators
 
 # ------------------------------------------------------------------ #
 # §3.1.1 – Material must use UsdPreviewSurface                         #
@@ -33,7 +26,7 @@ class TestMaterialPortability:
 #usda 1.0
 def Material "Mat" {}
 """)
-        assert has(run_check(stage, MaterialPortabilityCheck), "3.1.1")
+        assert has(run_validators(stage, "rep0158:MaterialPortability"), "3.1.1")
 
     def test_material_with_preview_surface_no_violation(self):
         stage = make_stage("""
@@ -49,7 +42,7 @@ def Material "Mat" {
     }
 }
 """)
-        assert none_with(run_check(stage, MaterialPortabilityCheck), "3.1.1")
+        assert none_with(run_validators(stage, "rep0158:MaterialPortability"), "3.1.1")
 
     def test_material_with_mdl_shader_only_gives_warning(self):
         """Proprietary shader on the universal terminal without UsdPreviewSurface."""
@@ -64,7 +57,7 @@ def Material "Mat" {
     }
 }
 """)
-        assert has(run_check(stage, MaterialPortabilityCheck), "3.1.1")
+        assert has(run_validators(stage, "rep0158:MaterialPortability"), "3.1.1")
 
 
 # ------------------------------------------------------------------ #
@@ -90,7 +83,7 @@ def Shader "Tex" {{
     float3 outputs:rgb
 }}
 """)
-        assert has(run_check(stage, TextureFormatCheck), "3.1.2")
+        assert has(run_validators(stage, "rep0158:TextureFormat"), "3.1.2")
 
     def test_non_udim_texture_no_violation(self):
         stage = make_stage("""
@@ -101,7 +94,7 @@ def Shader "Tex" {
     float3 outputs:rgb
 }
 """)
-        assert none_with(run_check(stage, TextureFormatCheck), "3.1.2")
+        assert none_with(run_validators(stage, "rep0158:TextureFormat"), "3.1.2")
 
 
 # ------------------------------------------------------------------ #
@@ -120,7 +113,7 @@ def Shader "Tex" {{
     float3 outputs:rgb
 }}
 """)
-        assert has(run_check(stage, TextureFormatCheck), "3.2.1")
+        assert has(run_validators(stage, "rep0158:TextureFormat"), "3.2.1")
 
     @pytest.mark.parametrize("ext", [".png", ".jpg", ".jpeg"])
     def test_permitted_texture_extensions_no_violation(self, ext):
@@ -132,7 +125,7 @@ def Shader "Tex" {{
     float3 outputs:rgb
 }}
 """)
-        assert none_with(run_check(stage, TextureFormatCheck), "3.2.1")
+        assert none_with(run_validators(stage, "rep0158:TextureFormat"), "3.2.1")
 
     def test_non_uvtexture_shader_not_checked(self):
         """Shaders other than UsdUVTexture are out of scope for format checks."""
@@ -143,7 +136,7 @@ def Shader "Surf" {
     token outputs:surface
 }
 """)
-        assert none_with(run_check(stage, TextureFormatCheck), "3.2.1")
+        assert none_with(run_validators(stage, "rep0158:TextureFormat"), "3.2.1")
 
     def test_data_map_with_jpeg_gives_error(self):
         stage = make_stage("""
@@ -154,7 +147,7 @@ def Shader "Tex" {
     float3 outputs:rgb
 }
 """)
-        assert has(run_check(stage, TextureFormatCheck), "3.2.2")
+        assert has(run_validators(stage, "rep0158:TextureFormat"), "3.2.2")
 
     def test_data_map_with_png_no_violation(self):
         stage = make_stage("""
@@ -165,7 +158,7 @@ def Shader "Tex" {
     float outputs:r
 }
 """)
-        assert none_with(run_check(stage, TextureFormatCheck), "3.2.2")
+        assert none_with(run_validators(stage, "rep0158:TextureFormat"), "3.2.2")
 
 
 class TestTextureBaking:
@@ -177,7 +170,7 @@ def Shader "Noise" {
     float outputs:result
 }
 """)
-        assert has(run_check(stage, TextureBakingCheck), "3.3.1")
+        assert has(run_validators(stage, "rep0158:TextureBaking"), "3.3.1")
 
     def test_uvtexture_shader_no_violation(self):
         stage = make_stage("""
@@ -188,7 +181,7 @@ def Shader "Tex" {
     float3 outputs:rgb
 }
 """)
-        assert none_with(run_check(stage, TextureBakingCheck), "3.3.1")
+        assert none_with(run_validators(stage, "rep0158:TextureBaking"), "3.3.1")
 
 
 # ------------------------------------------------------------------ #
@@ -213,7 +206,7 @@ def Mesh "Collider" (
     ]
 }
 """)
-        assert has(run_check(stage, GeometryConstraintsCheck), "3.4.1")
+        assert has(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.1")
 
     def test_triangulated_collision_mesh_no_violation(self):
         stage = make_stage("""
@@ -229,7 +222,7 @@ def Mesh "Collider" (
     ]
 }
 """)
-        assert none_with(run_check(stage, GeometryConstraintsCheck), "3.4.1")
+        assert none_with(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.1")
 
     def test_ngon_visual_mesh_not_checked(self):
         """Visual meshes (no CollisionAPI, no 'guide' purpose) are not checked for triangulation."""
@@ -244,7 +237,7 @@ def Mesh "Visual" {
     ]
 }
 """)
-        assert none_with(run_check(stage, GeometryConstraintsCheck), "3.4.1")
+        assert none_with(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.1")
 
     def test_collision_mesh_named_collision_scope_not_triangulated_gives_error(self):
         """Heuristic: parent named 'collision' also marks mesh as collision geometry."""
@@ -260,7 +253,7 @@ def Xform "link" {
     }
 }
 """)
-        assert has(run_check(stage, GeometryConstraintsCheck), "3.4.1")
+        assert has(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.1")
 
 
 # ------------------------------------------------------------------ #
@@ -279,7 +272,7 @@ def Mesh "Visual" {
     point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
 }
 """)
-        assert has(run_check(stage, GeometryConstraintsCheck), "3.4.2")
+        assert has(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.2")
 
     def test_right_handed_mesh_no_violation(self):
         stage = make_stage("""
@@ -291,7 +284,7 @@ def Mesh "Visual" {
     point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
 }
 """)
-        assert none_with(run_check(stage, GeometryConstraintsCheck), "3.4.2")
+        assert none_with(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.2")
 
     def test_default_orientation_no_violation(self):
         """OpenUSD default is rightHanded; no authored orientation must not be flagged."""
@@ -303,7 +296,7 @@ def Mesh "Visual" {
     point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
 }
 """)
-        assert none_with(run_check(stage, GeometryConstraintsCheck), "3.4.2")
+        assert none_with(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.2")
 
 
 # ------------------------------------------------------------------ #
@@ -322,7 +315,7 @@ def Mesh "Visual" {
     point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
 }
 """)
-        assert has(run_check(stage, GeometryConstraintsCheck), "3.4.3")
+        assert has(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.3")
 
     def test_single_sided_mesh_no_violation(self):
         stage = make_stage("""
@@ -334,7 +327,7 @@ def Mesh "Visual" {
     point3f[] points = [(0,0,0),(1,0,0),(0,1,0)]
 }
 """)
-        assert none_with(run_check(stage, GeometryConstraintsCheck), "3.4.3")
+        assert none_with(run_validators(stage, "rep0158:GeometryConstraints"), "3.4.3")
 
 
 # ------------------------------------------------------------------ #
@@ -348,14 +341,14 @@ class TestLightingPortability:
 #usda 1.0
 def RectLight "AreaLight" {}
 """)
-        assert has(run_check(stage, LightingPortabilityCheck), "3.6.1")
+        assert has(run_validators(stage, "rep0158:LightingPortability"), "3.6.1")
 
     def test_cylinder_light_gives_warning(self):
         stage = make_stage("""
 #usda 1.0
 def CylinderLight "TubeLight" {}
 """)
-        assert has(run_check(stage, LightingPortabilityCheck), "3.6.1")
+        assert has(run_validators(stage, "rep0158:LightingPortability"), "3.6.1")
 
     def test_punctual_light_no_violation(self):
         stage = make_stage("""
@@ -363,4 +356,4 @@ def CylinderLight "TubeLight" {}
 def SphereLight "PointLike" {}
 def DistantLight "Sun" {}
 """)
-        assert none_with(run_check(stage, LightingPortabilityCheck), "3.6.1")
+        assert none_with(run_validators(stage, "rep0158:LightingPortability"), "3.6.1")
