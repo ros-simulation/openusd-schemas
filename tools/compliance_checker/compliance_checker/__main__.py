@@ -106,7 +106,7 @@ def main(
     no_extensions: bool,
     verbose: bool,
 ) -> None:
-    """Validate a USD asset against the REP-XXXX interoperability standard.
+    """Validate a USD asset against the REP-0158 interoperability standard.
 
     ASSET is the path to a .usd / .usda / .usdc file.
 

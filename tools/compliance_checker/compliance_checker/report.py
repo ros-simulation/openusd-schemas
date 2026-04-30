@@ -1,4 +1,4 @@
-"""Report data structures for the REP-XXXX compliance checker."""
+"""Report data structures for the REP-0158 compliance checker."""
 
 from __future__ import annotations
 

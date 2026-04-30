@@ -1,4 +1,4 @@
-"""REP-XXXX OpenUSD Simulation Asset Compliance Checker."""
+"""REP-0158 OpenUSD Simulation Asset Compliance Checker."""
 
 from .checker import ComplianceChecker
 from .report import Report, Severity, Violation
