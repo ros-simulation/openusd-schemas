@@ -1,12 +1,12 @@
 """Check registry: assembles built-in checks and loads extension plug-ins.
 
 Extension packages register additional check classes via the entry-point
-group ``"repXXXX.checks"``.  Each entry point must resolve to a
+group ``"rep0158.checks"``.  Each entry point must resolve to a
 :class:`~checks.base.BaseCheck` subclass (not an instance).
 
 Example pyproject.toml entry for an extension package::
 
-    [project.entry-points."repXXXX.checks"]
+    [project.entry-points."rep0158.checks"]
     my_sensor = "my_sensor_pkg.checks:SensorCameraCheck"
 """
 
@@ -113,11 +113,11 @@ _EXPORT_CHECKS: list[type[BaseCheck]] = [
     LightingPortabilityCheck,
 ]
 
-_ENTRY_POINT_GROUP = "repXXXX.checks"
+_ENTRY_POINT_GROUP = "rep0158.checks"
 
 
 def _load_extension_checks() -> list[type[BaseCheck]]:
-    """Load check classes registered via the ``repXXXX.checks`` entry-point group."""
+    """Load check classes registered via the ``rep0158.checks`` entry-point group."""
     extra: list[type[BaseCheck]] = []
     try:
         eps = importlib.metadata.entry_points(group=_ENTRY_POINT_GROUP)
@@ -153,7 +153,7 @@ def build_checks(
             Only checks whose ``section`` starts with one of these strings are kept.
             ``None`` means all sections are included.
         include_extensions: When True (default), attempt to load plug-in checks
-            registered via the ``repXXXX.checks`` entry-point group.
+            registered via the ``rep0158.checks`` entry-point group.
 
     Returns:
         A list of instantiated :class:`~checks.base.BaseCheck` objects.

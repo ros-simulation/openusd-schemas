@@ -1,4 +1,4 @@
-"""Shared fixtures and helpers for the REP-XXXX compliance checker test suite."""
+"""Shared fixtures and helpers for the REP-0158 compliance checker test suite."""
 
 from __future__ import annotations
 
