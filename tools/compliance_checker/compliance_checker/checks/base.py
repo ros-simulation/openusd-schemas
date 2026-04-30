@@ -53,6 +53,37 @@ def _error(
     return ValidationError(name, error_type, sites, msg)
 
 
+def _site(prim: "Usd.Prim") -> list[ErrorSite]:
+    return [ErrorSite(prim.GetStage(), prim.GetPath())]
+
+
+PrimValidatorFn = Callable[
+    ["Usd.Prim", TimeRange], list[ValidationError]
+]
+
+
+def register_prim_validator(
+    name: str,
+    fn: PrimValidatorFn,
+    *,
+    doc: str = "",
+    keywords: list[str] | None = None,
+    section: str = "",
+    schema_types: list[str] | None = None,
+) -> None:
+    kw = list(keywords or [])
+    if section:
+        kw.append(f"rep0158:{section}")
+    kw.append("rep0158")
+    metadata = UsdValidation.ValidatorMetadata(
+        name=f"rep0158:{name}",
+        doc=doc,
+        keywords=kw,
+        schemaTypes=schema_types or [],
+    )
+    _registry.RegisterPrimValidator(metadata, fn)
+
+
 def register_stage_validator(
     name: str,
     fn: StageValidatorFn,
