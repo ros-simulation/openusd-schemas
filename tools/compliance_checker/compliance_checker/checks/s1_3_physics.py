@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Iterator
 
 from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
-from ..report import Severity, Violation
-from .base import BaseCheck
+from .base import (
+    ErrorType,
+    TimeRange,
+    _error,
+    _prim_site,
+    _stage_site,
+    register_stage_validator,
+)
 
 
 def _has_api(prim: Usd.Prim, api_type) -> bool:
@@ -28,78 +33,84 @@ def _applied(prim: Usd.Prim) -> set[str]:
     return set(list_op.GetAppliedItems())
 
 
-class JointLimitsCheck(BaseCheck):
-    """REP §1.3: Non-continuous joints must author explicit limit attributes."""
+# ------------------------------------------------------------------ #
+# JointLimits                                                          #
+# ------------------------------------------------------------------ #
 
-    section = "1.3"
 
-    _JOINT_TYPES = {
-        "PhysicsRevoluteJoint": UsdPhysics.RevoluteJoint,
-        "PhysicsPrismaticJoint": UsdPhysics.PrismaticJoint,
-    }
-
-    def run(self, stage: Usd.Stage) -> Iterator[Violation]:
-        for prim in stage.TraverseAll():
-            type_name = prim.GetTypeName()
-            if type_name not in self._JOINT_TYPES:
-                continue
-            yield from self._check_limits(prim)
-
-    def _check_limits(self, prim: Usd.Prim) -> Iterator[Violation]:
-        # UsdPhysics defaults are -inf / +inf (meaning no limit). Check IsAuthored()
-        # rather than Get() == None, because the default is a valid float, not None.
+def _check_joint_limits(stage: Usd.Stage, timeRange: TimeRange) -> list:
+    errors = []
+    for prim in stage.TraverseAll():
+        type_name = prim.GetTypeName()
+        if type_name not in (
+            "PhysicsRevoluteJoint",
+            "PhysicsPrismaticJoint",
+        ):
+            continue
         prim_path = str(prim.GetPath())
         lower = prim.GetAttribute("physics:lowerLimit")
         upper = prim.GetAttribute("physics:upperLimit")
 
         if not lower.IsAuthored():
-            yield Violation(
-                check_id="1.3.1",
-                severity=Severity.ERROR,
-                prim_path=prim_path,
-                section=self.section,
-                message=(
-                    f"Joint '{prim_path}' ({prim.GetTypeName()}) is missing "
-                    "'physics:lowerLimit'. Non-continuous joints must author explicit limits "
-                    "per REP §1.3."
-                ),
-                suggestion="Author `float physics:lowerLimit = <value>` on this joint prim.",
+            errors.append(
+                _error(
+                    "1.3.1",
+                    ErrorType.Error,
+                    _prim_site(stage, prim_path),
+                    (
+                        f"Joint '{prim_path}' ({type_name}) is missing "
+                        "'physics:lowerLimit'. Non-continuous joints must author explicit limits "
+                        "per REP §1.3."
+                    ),
+                    suggestion="Author `float physics:lowerLimit = <value>` on this joint prim.",
+                )
             )
 
         if not upper.IsAuthored():
-            yield Violation(
-                check_id="1.3.1",
-                severity=Severity.ERROR,
-                prim_path=prim_path,
-                section=self.section,
-                message=(
-                    f"Joint '{prim_path}' ({prim.GetTypeName()}) is missing "
-                    "'physics:upperLimit'. Non-continuous joints must author explicit limits "
-                    "per REP §1.3."
-                ),
-                suggestion="Author `float physics:upperLimit = <value>` on this joint prim.",
+            errors.append(
+                _error(
+                    "1.3.1",
+                    ErrorType.Error,
+                    _prim_site(stage, prim_path),
+                    (
+                        f"Joint '{prim_path}' ({type_name}) is missing "
+                        "'physics:upperLimit'. Non-continuous joints must author explicit limits "
+                        "per REP §1.3."
+                    ),
+                    suggestion="Author `float physics:upperLimit = <value>` on this joint prim.",
+                )
             )
+    return errors
 
 
-class ArticulationRootCheck(BaseCheck):
-    """REP §1.3: At most one ArticulationRootAPI per connected kinematic tree."""
+register_stage_validator(
+    "JointLimits",
+    _check_joint_limits,
+    doc="REP §1.3: Non-continuous joints must author explicit limit attributes.",
+    section="1.3",
+)
 
-    section = "1.3"
 
-    def run(self, stage: Usd.Stage) -> Iterator[Violation]:
-        roots = [
-            prim
-            for prim in stage.TraverseAll()
-            if _has_api(prim, UsdPhysics.ArticulationRootAPI)
-        ]
-        if len(roots) > 1:
-            paths = ", ".join(str(p.GetPath()) for p in roots)
-            yield Violation(
-                check_id="1.3.2",
-                severity=Severity.WARNING,
-                prim_path="/",
-                section=self.section,
-                message=(
+# ------------------------------------------------------------------ #
+# ArticulationRoot                                                     #
+# ------------------------------------------------------------------ #
+
+
+def _check_articulation_root(stage: Usd.Stage, timeRange: TimeRange) -> list:
+    errors = []
+    roots = [
+        prim
+        for prim in stage.TraverseAll()
+        if _has_api(prim, UsdPhysics.ArticulationRootAPI)
+    ]
+    if len(roots) > 1:
+        paths = ", ".join(str(p.GetPath()) for p in roots)
+        errors.append(
+            _error(
+                "1.3.2",
+                ErrorType.Warn,
+                _stage_site(stage),
+                (
                     f"Stage contains {len(roots)} ArticulationRootAPI prims: [{paths}]. "
                     "There must be at most one per connected kinematic tree per REP §1.3. "
                     "Multiple roots in the same tree will fracture reduced-coordinate solvers."
@@ -110,146 +121,168 @@ class ArticulationRootCheck(BaseCheck):
                     "to prune nested roots in the composing stage."
                 ),
             )
+        )
+    return errors
 
 
-class MassPropertiesCheck(BaseCheck):
-    """REP §1.3: Dynamic bodies must have mass > 0; no zero-mass hack."""
+register_stage_validator(
+    "ArticulationRoot",
+    _check_articulation_root,
+    doc="REP §1.3: At most one ArticulationRootAPI per connected kinematic tree.",
+    section="1.3",
+)
 
-    section = "1.3"
 
-    def run(self, stage: Usd.Stage) -> Iterator[Violation]:
-        for prim in stage.TraverseAll():
-            if not _has_api(prim, UsdPhysics.RigidBodyAPI):
-                continue
-            yield from self._check_mass(prim)
+# ------------------------------------------------------------------ #
+# MassProperties                                                       #
+# ------------------------------------------------------------------ #
 
-    def _check_mass(self, prim: Usd.Prim) -> Iterator[Violation]:
+
+def _check_mass_properties(stage: Usd.Stage, timeRange: TimeRange) -> list:
+    errors = []
+    for prim in stage.TraverseAll():
+        if not _has_api(prim, UsdPhysics.RigidBodyAPI):
+            continue
         if not _has_api(prim, UsdPhysics.MassAPI):
-            return
+            continue
         mass_attr = prim.GetAttribute("physics:mass")
         if not mass_attr.IsValid():
-            return
+            continue
         mass = mass_attr.Get()
         if mass is not None and mass <= 0.0:
-            yield Violation(
-                check_id="1.3.3",
-                severity=Severity.WARNING,
-                prim_path=str(prim.GetPath()),
-                section=self.section,
-                message=(
-                    f"Prim '{prim.GetPath()}' has PhysicsRigidBodyAPI with non-positive "
-                    f"physics:mass = {mass}. Dynamic bodies must define strictly positive "
-                    "mass per REP §1.3."
-                ),
-                suggestion=(
-                    "For static environments: omit PhysicsRigidBodyAPI (keep only CollisionAPI). "
-                    "For robot anchors: set a valid mass > 0 and anchor via UsdPhysicsFixedJoint "
-                    "with an empty body0 relationship. "
-                    "For kinematic bodies: set physics:kinematicEnabled = true."
-                ),
+            errors.append(
+                _error(
+                    "1.3.3",
+                    ErrorType.Warn,
+                    _prim_site(stage, str(prim.GetPath())),
+                    (
+                        f"Prim '{prim.GetPath()}' has PhysicsRigidBodyAPI with non-positive "
+                        f"physics:mass = {mass}. Dynamic bodies must define strictly positive "
+                        "mass per REP §1.3."
+                    ),
+                    suggestion=(
+                        "For static environments: omit PhysicsRigidBodyAPI (keep only CollisionAPI). "
+                        "For robot anchors: set a valid mass > 0 and anchor via UsdPhysicsFixedJoint "
+                        "with an empty body0 relationship. "
+                        "For kinematic bodies: set physics:kinematicEnabled = true."
+                    ),
+                )
             )
+    return errors
 
 
-class CollisionMaterialCheck(BaseCheck):
-    """REP §1.3.4: Collision geometry must bind a physics material with friction/restitution."""
+register_stage_validator(
+    "MassProperties",
+    _check_mass_properties,
+    doc="REP §1.3: Dynamic bodies must have mass > 0; no zero-mass hack.",
+    section="1.3",
+)
 
-    section = "1.3"
 
-    _REQUIRED_ATTRS = (
-        "physics:staticFriction",
-        "physics:dynamicFriction",
-        "physics:restitution",
-    )
+# ------------------------------------------------------------------ #
+# CollisionMaterial                                                    #
+# ------------------------------------------------------------------ #
 
-    def run(self, stage: Usd.Stage) -> Iterator[Violation]:
-        for prim in stage.TraverseAll():
-            if not _has_api(prim, UsdPhysics.CollisionAPI):
-                continue
-            yield from self._check_physics_material_binding(prim, stage)
+_CM_REQUIRED_ATTRS = (
+    "physics:staticFriction",
+    "physics:dynamicFriction",
+    "physics:restitution",
+)
 
-    def _check_physics_material_binding(
-        self, prim: Usd.Prim, stage: Usd.Stage
-    ) -> Iterator[Violation]:
+
+def _check_collision_material(stage: Usd.Stage, timeRange: TimeRange) -> list:
+    errors = []
+    for prim in stage.TraverseAll():
+        if not _has_api(prim, UsdPhysics.CollisionAPI):
+            continue
         prim_path = str(prim.GetPath())
         binding_api = UsdShade.MaterialBindingAPI(prim)
-        # Check for a physics-purpose binding
         direct = binding_api.GetDirectBinding("physics")
         if not direct.GetMaterialPath():
-            yield Violation(
-                check_id="1.3.5",
-                severity=Severity.WARNING,
-                prim_path=prim_path,
-                section=self.section,
-                message=(
-                    f"Collision geometry '{prim_path}' has no physics material binding "
-                    "(material:binding:physics). Deterministic contact dynamics require a "
-                    "UsdPhysicsMaterialAPI material bound with the physics purpose per REP §1.3.4."
-                ),
-                suggestion=(
-                    "Create a UsdShadeMaterial with UsdPhysicsMaterialAPI and bind it via "
-                    "`UsdShade.MaterialBindingAPI(prim).Bind(mat, purpose='physics')`."
-                ),
+            errors.append(
+                _error(
+                    "1.3.5",
+                    ErrorType.Warn,
+                    _prim_site(stage, prim_path),
+                    (
+                        f"Collision geometry '{prim_path}' has no physics material binding "
+                        "(material:binding:physics). Deterministic contact dynamics require a "
+                        "UsdPhysicsMaterialAPI material bound with the physics purpose per REP §1.3.4."
+                    ),
+                    suggestion=(
+                        "Create a UsdShadeMaterial with UsdPhysicsMaterialAPI and bind it via "
+                        "`UsdShade.MaterialBindingAPI(prim).Bind(mat, purpose='physics')`."
+                    ),
+                )
             )
-            return
+            continue
 
-        # Material exists – verify it defines the required attributes
         mat_path = direct.GetMaterialPath()
         mat_prim = stage.GetPrimAtPath(mat_path)
         if not mat_prim.IsValid():
-            return
+            continue
 
-        for attr_name in self._REQUIRED_ATTRS:
+        for attr_name in _CM_REQUIRED_ATTRS:
             attr = mat_prim.GetAttribute(attr_name)
-            # UsdPhysics gives these schema defaults (0.0), so use IsAuthored()
             if not attr.IsAuthored():
-                yield Violation(
-                    check_id="1.3.5",
-                    severity=Severity.WARNING,
-                    prim_path=str(mat_path),
-                    section=self.section,
-                    message=(
-                        f"Physics material '{mat_path}' bound to '{prim_path}' is missing "
-                        f"'{attr_name}'. All three contact physics attributes must be defined "
-                        "per REP §1.3.4."
-                    ),
-                    suggestion=f"Author `float {attr_name} = <value>` on the material prim.",
+                errors.append(
+                    _error(
+                        "1.3.5",
+                        ErrorType.Warn,
+                        _prim_site(stage, str(mat_path)),
+                        (
+                            f"Physics material '{mat_path}' bound to '{prim_path}' is missing "
+                            f"'{attr_name}'. All three contact physics attributes must be defined "
+                            "per REP §1.3.4."
+                        ),
+                        suggestion=f"Author `float {attr_name} = <value>` on the material prim.",
+                    )
+                )
+    return errors
+
+
+register_stage_validator(
+    "CollisionMaterial",
+    _check_collision_material,
+    doc="REP §1.3.4: Collision geometry must bind a physics material with friction/restitution.",
+    section="1.3",
+)
+
+
+# ------------------------------------------------------------------ #
+# CollisionGeometryAuthoring                                           #
+# ------------------------------------------------------------------ #
+
+
+def _check_collision_geometry_authoring(
+    stage: Usd.Stage, timeRange: TimeRange
+) -> list:
+    errors = []
+    for prim in stage.TraverseAll():
+        if not _has_api(prim, UsdPhysics.CollisionAPI):
+            continue
+        prim_path = str(prim.GetPath())
+
+        # Check purpose
+        imageable = UsdGeom.Imageable(prim)
+        if imageable:
+            purpose_attr = imageable.GetPurposeAttr()
+            purpose = purpose_attr.Get() if purpose_attr.IsValid() else None
+            if purpose != UsdGeom.Tokens.guide:
+                errors.append(
+                    _error(
+                        "1.3.4",
+                        ErrorType.Warn,
+                        _prim_site(stage, prim_path),
+                        (
+                            f"Collision geometry '{prim_path}' has purpose={purpose!r}. "
+                            "Collision geometry should explicitly set purpose='guide' per REP §1.3.1."
+                        ),
+                        suggestion="Author `token purpose = 'guide'` on collision geometry prims.",
+                    )
                 )
 
-
-class CollisionGeometryAuthoringCheck(BaseCheck):
-    """REP §1.3.1: Collision geometry should use guide purpose and none approximation."""
-
-    section = "1.3"
-
-    def run(self, stage: Usd.Stage) -> Iterator[Violation]:
-        for prim in stage.TraverseAll():
-            if not _has_api(prim, UsdPhysics.CollisionAPI):
-                continue
-            yield from self._check_purpose(prim)
-            yield from self._check_approximation(prim)
-
-    def _check_purpose(self, prim: Usd.Prim) -> Iterator[Violation]:
-        imageable = UsdGeom.Imageable(prim)
-        if not imageable:
-            return
-        purpose_attr = imageable.GetPurposeAttr()
-        purpose = purpose_attr.Get() if purpose_attr.IsValid() else None
-        if purpose != UsdGeom.Tokens.guide:
-            yield Violation(
-                check_id="1.3.4",
-                severity=Severity.WARNING,
-                prim_path=str(prim.GetPath()),
-                section=self.section,
-                message=(
-                    f"Collision geometry '{prim.GetPath()}' has purpose={purpose!r}. "
-                    "Collision geometry should explicitly set purpose='guide' per REP §1.3.1."
-                ),
-                suggestion=(
-                    "Author `token purpose = 'guide'` on collision geometry prims."
-                ),
-            )
-
-    def _check_approximation(self, prim: Usd.Prim) -> Iterator[Violation]:
+        # Check approximation
         approximation_attr = prim.GetAttribute("physics:approximation")
         approximation = (
             approximation_attr.Get()
@@ -257,41 +290,89 @@ class CollisionGeometryAuthoringCheck(BaseCheck):
             else None
         )
         if approximation != "none":
-            yield Violation(
-                check_id="1.3.4",
-                severity=Severity.WARNING,
-                prim_path=str(prim.GetPath()),
-                section=self.section,
-                message=(
-                    f"Collision geometry '{prim.GetPath()}' has physics:approximation="
-                    f"{approximation!r}. Collision geometry should explicitly set "
-                    "physics:approximation='none' per REP §1.3.1."
-                ),
-                suggestion=(
-                    "Author `token physics:approximation = 'none'` on collision geometry prims."
-                ),
+            errors.append(
+                _error(
+                    "1.3.4",
+                    ErrorType.Warn,
+                    _prim_site(stage, prim_path),
+                    (
+                        f"Collision geometry '{prim_path}' has physics:approximation="
+                        f"{approximation!r}. Collision geometry should explicitly set "
+                        "physics:approximation='none' per REP §1.3.1."
+                    ),
+                    suggestion=(
+                        "Author `token physics:approximation = 'none'` on collision geometry prims."
+                    ),
+                )
             )
+    return errors
 
 
-class MimicJointCheck(BaseCheck):
-    """REP §1.3: MimicJointAPI is deprecated; assets must use ExtendedPhysicsMimicAPI."""
+register_stage_validator(
+    "CollisionGeometryAuthoring",
+    _check_collision_geometry_authoring,
+    doc="REP §1.3.1: Collision geometry should use guide purpose and none approximation.",
+    section="1.3",
+)
 
-    section = "1.3"
 
-    _ALLOWED_TYPES = {"PhysicsRevoluteJoint", "PhysicsPrismaticJoint"}
+# ------------------------------------------------------------------ #
+# MimicJoint                                                           #
+# ------------------------------------------------------------------ #
 
-    def run(self, stage: Usd.Stage) -> Iterator[Violation]:
-        mimic_graph: dict[str, list[str]] = defaultdict(list)
-        for prim in stage.TraverseAll():
-            if "MimicJointAPI" not in _applied(prim):
-                continue
-            prim_path = str(prim.GetPath())
-            yield Violation(
-                check_id="1.3.9",
-                severity=Severity.WARNING,
-                prim_path=prim_path,
-                section=self.section,
-                message=(
+_MIMIC_ALLOWED_TYPES = {"PhysicsRevoluteJoint", "PhysicsPrismaticJoint"}
+
+
+def _check_mimic_cycle_free_graph(mimic_graph: dict[str, list[str]], stage: Usd.Stage) -> list:
+    errors = []
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def dfs(node: str, stack: list[str]) -> None:
+        if node in visiting:
+            cycle = stack[stack.index(node):] + [node]
+            errors.append(
+                _error(
+                    "1.3.7",
+                    ErrorType.Error,
+                    _prim_site(stage, node),
+                    (
+                        "MimicJointAPI relationships must form a DAG. "
+                        f"Detected cycle: {' -> '.join(cycle)}."
+                    ),
+                    suggestion="Break the mimic cycle by removing one coupling edge.",
+                )
+            )
+            return
+        if node in visited:
+            return
+        visiting.add(node)
+        stack.append(node)
+        for target in mimic_graph.get(node, []):
+            dfs(target, stack)
+        stack.pop()
+        visiting.remove(node)
+        visited.add(node)
+
+    for node in mimic_graph:
+        dfs(node, [])
+    return errors
+
+
+def _check_mimic_joint(stage: Usd.Stage, timeRange: TimeRange) -> list:
+    errors = []
+    mimic_graph: dict[str, list[str]] = defaultdict(list)
+
+    for prim in stage.TraverseAll():
+        if "MimicJointAPI" not in _applied(prim):
+            continue
+        prim_path = str(prim.GetPath())
+        errors.append(
+            _error(
+                "1.3.9",
+                ErrorType.Warn,
+                _prim_site(stage, prim_path),
+                (
                     f"Prim '{prim_path}' uses deprecated 'MimicJointAPI'. "
                     "REP §1.3 now requires 'ExtendedPhysicsMimicAPI' (ext_physics:mimic:*) "
                     "for mimic joint coupling. MimicJointAPI has been removed from the spec."
@@ -303,15 +384,15 @@ class MimicJointCheck(BaseCheck):
                     "'ext_physics:mimic:offset'."
                 ),
             )
-            type_name = prim.GetTypeName()
-            prim_path = str(prim.GetPath())
-            if type_name not in self._ALLOWED_TYPES:
-                yield Violation(
-                    check_id="1.3.7",
-                    severity=Severity.WARNING,
-                    prim_path=prim_path,
-                    section=self.section,
-                    message=(
+        )
+        type_name = prim.GetTypeName()
+        if type_name not in _MIMIC_ALLOWED_TYPES:
+            errors.append(
+                _error(
+                    "1.3.7",
+                    ErrorType.Warn,
+                    _prim_site(stage, prim_path),
+                    (
                         f"MimicJointAPI is applied to '{prim_path}' (type: '{type_name}'). "
                         "MimicJointAPI must only be applied to PhysicsRevoluteJoint or "
                         "PhysicsPrismaticJoint per REP §1.3."
@@ -321,15 +402,16 @@ class MimicJointCheck(BaseCheck):
                         "PhysicsRevoluteJoint / PhysicsPrismaticJoint."
                     ),
                 )
-                continue
-            rel = prim.GetRelationship("mimic:joint")
-            if not rel.IsValid():
-                yield Violation(
-                    check_id="1.3.7",
-                    severity=Severity.ERROR,
-                    prim_path=prim_path,
-                    section=self.section,
-                    message=(
+            )
+            continue
+        rel = prim.GetRelationship("mimic:joint")
+        if not rel.IsValid():
+            errors.append(
+                _error(
+                    "1.3.7",
+                    ErrorType.Error,
+                    _prim_site(stage, prim_path),
+                    (
                         f"MimicJointAPI on '{prim_path}' is missing required relationship "
                         "'mimic:joint'."
                     ),
@@ -338,128 +420,108 @@ class MimicJointCheck(BaseCheck):
                         "source revolute/prismatic joint."
                     ),
                 )
-                continue
-            targets = rel.GetTargets()
-            if len(targets) != 1:
-                yield Violation(
-                    check_id="1.3.7",
-                    severity=Severity.ERROR,
-                    prim_path=prim_path,
-                    section=self.section,
-                    message=(
+            )
+            continue
+        targets = rel.GetTargets()
+        if len(targets) != 1:
+            errors.append(
+                _error(
+                    "1.3.7",
+                    ErrorType.Error,
+                    _prim_site(stage, prim_path),
+                    (
                         f"'mimic:joint' on '{prim_path}' must target exactly one source joint; "
                         f"found {len(targets)} targets."
                     ),
                     suggestion="Keep exactly one relationship target.",
                 )
-                continue
-            target = targets[0]
-            source = stage.GetPrimAtPath(target)
-            if not source or not source.IsValid():
-                yield Violation(
-                    check_id="1.3.7",
-                    severity=Severity.ERROR,
-                    prim_path=prim_path,
-                    section=self.section,
-                    message=(
+            )
+            continue
+        target = targets[0]
+        source = stage.GetPrimAtPath(target)
+        if not source or not source.IsValid():
+            errors.append(
+                _error(
+                    "1.3.7",
+                    ErrorType.Error,
+                    _prim_site(stage, prim_path),
+                    (
                         f"'mimic:joint' on '{prim_path}' targets '{target}', which does not "
                         "exist in the composed stage."
                     ),
                     suggestion="Point to an existing revolute/prismatic joint prim.",
                 )
-                continue
-            if source.GetTypeName() not in self._ALLOWED_TYPES:
-                yield Violation(
-                    check_id="1.3.7",
-                    severity=Severity.ERROR,
-                    prim_path=prim_path,
-                    section=self.section,
-                    message=(
+            )
+            continue
+        if source.GetTypeName() not in _MIMIC_ALLOWED_TYPES:
+            errors.append(
+                _error(
+                    "1.3.7",
+                    ErrorType.Error,
+                    _prim_site(stage, prim_path),
+                    (
                         f"'mimic:joint' on '{prim_path}' targets '{target}' "
                         f"(type '{source.GetTypeName()}'). Source joint must be revolute or prismatic."
                     ),
                     suggestion="Target a PhysicsRevoluteJoint or PhysicsPrismaticJoint.",
                 )
-                continue
-            mimic_graph[prim_path].append(str(target))
-        yield from self._check_cycle_free_graph(mimic_graph)
+            )
+            continue
+        mimic_graph[prim_path].append(str(target))
 
-    def _check_cycle_free_graph(
-        self, mimic_graph: dict[str, list[str]]
-    ) -> Iterator[Violation]:
-        visiting: set[str] = set()
-        visited: set[str] = set()
-
-        def dfs(node: str, stack: list[str]) -> Iterator[Violation]:
-            if node in visiting:
-                cycle = stack[stack.index(node) :] + [node]
-                yield Violation(
-                    check_id="1.3.7",
-                    severity=Severity.ERROR,
-                    prim_path=node,
-                    section=self.section,
-                    message=(
-                        "MimicJointAPI relationships must form a DAG. "
-                        f"Detected cycle: {' -> '.join(cycle)}."
-                    ),
-                    suggestion="Break the mimic cycle by removing one coupling edge.",
-                )
-                return
-            if node in visited:
-                return
-            visiting.add(node)
-            stack.append(node)
-            for target in mimic_graph.get(node, []):
-                yield from dfs(target, stack)
-            stack.pop()
-            visiting.remove(node)
-            visited.add(node)
-
-        for node in mimic_graph:
-            yield from dfs(node, [])
+    errors.extend(_check_mimic_cycle_free_graph(mimic_graph, stage))
+    return errors
 
 
-class InstanceablePhysicsCheck(BaseCheck):
-    """REP §1.2.6: instanceable=true must not be set on physics/ROS prims."""
+register_stage_validator(
+    "MimicJoint",
+    _check_mimic_joint,
+    doc="REP §1.3: MimicJointAPI is deprecated; assets must use ExtendedPhysicsMimicAPI.",
+    section="1.3",
+)
 
-    section = "1.3"
 
-    _FORBIDDEN_APIS = {
-        "PhysicsRigidBodyAPI",
-        "RosContextAPI",
-        "RosTopicAPI",
-        "RosServiceAPI",
-        "RosActionAPI",
-    }
-    _FORBIDDEN_TYPES = {
-        "PhysicsRevoluteJoint",
-        "PhysicsPrismaticJoint",
-        "PhysicsFixedJoint",
-        "PhysicsSphericalJoint",
-        "PhysicsDistanceJoint",
-        "PhysicsPrismaticJoint",
-        "PhysicsJoint",
-    }
+# ------------------------------------------------------------------ #
+# InstanceablePhysics                                                  #
+# ------------------------------------------------------------------ #
 
-    def run(self, stage: Usd.Stage) -> Iterator[Violation]:
-        for prim in stage.TraverseAll():
-            if not prim.GetMetadata("instanceable"):
-                continue
-            applied = _applied(prim)
-            forbidden_apis = applied & self._FORBIDDEN_APIS
-            forbidden_type = prim.GetTypeName() in self._FORBIDDEN_TYPES
-            if forbidden_apis or forbidden_type:
-                reason = (
-                    f"applied schemas: {forbidden_apis}"
-                    if forbidden_apis
-                    else f"type: {prim.GetTypeName()}"
-                )
-                yield Violation(
-                    check_id="1.3.8",
-                    severity=Severity.ERROR,
-                    prim_path=str(prim.GetPath()),
-                    section=self.section,
-                    message=(
+_IP_FORBIDDEN_APIS = {
+    "PhysicsRigidBodyAPI",
+    "RosContextAPI",
+    "RosTopicAPI",
+    "RosServiceAPI",
+    "RosActionAPI",
+}
+_IP_FORBIDDEN_TYPES = {
+    "PhysicsRevoluteJoint",
+    "PhysicsPrismaticJoint",
+    "PhysicsFixedJoint",
+    "PhysicsSphericalJoint",
+    "PhysicsDistanceJoint",
+    "PhysicsJoint",
+}
+
+
+def _check_instanceable_physics(stage: Usd.Stage, timeRange: TimeRange) -> list:
+    errors = []
+    for prim in stage.TraverseAll():
+        if not prim.GetMetadata("instanceable"):
+            continue
+        applied_schemas = _applied(prim)
+        forbidden_apis = applied_schemas & _IP_FORBIDDEN_APIS
+        forbidden_type = prim.GetTypeName() in _IP_FORBIDDEN_TYPES
+        if forbidden_apis or forbidden_type:
+            reason = (
+                f"applied schemas: {forbidden_apis}"
+                if forbidden_apis
+                else f"type: {prim.GetTypeName()}"
+            )
+            errors.append(
+                _error(
+                    "1.3.8",
+                    ErrorType.Error,
+                    _prim_site(stage, str(prim.GetPath())),
+                    (
                         f"Prim '{prim.GetPath()}' has instanceable=true but carries physics "
                         f"or ROS schemas ({reason}). Instance proxies obscure child prims from "
                         "relationship targeting, breaking joints and ROS interfaces per REP §3.5."
@@ -469,3 +531,13 @@ class InstanceablePhysicsCheck(BaseCheck):
                         "Move physics and ROS schemas to a non-instanceable parent."
                     ),
                 )
+            )
+    return errors
+
+
+register_stage_validator(
+    "InstanceablePhysics",
+    _check_instanceable_physics,
+    doc="REP §1.2.6: instanceable=true must not be set on physics/ROS prims.",
+    section="1.3",
+)

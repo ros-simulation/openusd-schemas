@@ -1,33 +1,84 @@
-"""Abstract base class for all compliance checks."""
+"""Registration helpers for UsdValidation-based compliance checks."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Callable
+
+from pxr import Sdf, UsdValidation
 
 if TYPE_CHECKING:
     from pxr import Usd
 
-    from ..report import Violation
+_registry = UsdValidation.ValidationRegistry()
+
+ErrorType = UsdValidation.ValidationErrorType
+ValidationError = UsdValidation.ValidationError
+ErrorSite = UsdValidation.ValidationErrorSite
+TimeRange = UsdValidation.ValidationTimeRange
+
+StageValidatorFn = Callable[
+    ["Usd.Stage", TimeRange], list[ValidationError]
+]
 
 
-class BaseCheck(ABC):
-    """Each concrete check class covers one numbered section of the REP.
+def _stage_site(stage: "Usd.Stage") -> list[ErrorSite]:
+    return [ErrorSite(stage, Sdf.Path.absoluteRootPath)]
 
-    Subclasses must:
-    - Set the *section* class attribute (e.g. ``"1.1"``).
-    - Implement :meth:`run`, yielding :class:`~report.Violation` instances.
-    """
 
-    section: str = ""
+def _prim_site(stage: "Usd.Stage", prim_path: str) -> list[ErrorSite]:
+    return [ErrorSite(stage, Sdf.Path(prim_path))]
 
-    @abstractmethod
-    def run(self, stage: "Usd.Stage") -> Iterator["Violation"]:
-        """Yield every non-conformance found in *stage*.
 
-        The generator is allowed to be empty (no violations found).
-        """
-        ...
+def _layer_site(layer: "Sdf.Layer") -> list[ErrorSite]:
+    return [ErrorSite(layer, Sdf.Path.absoluteRootPath)]
 
-    def __repr__(self) -> str:
-        return f"<{type(self).__name__} section={self.section!r}>"
+
+def _error(
+    name: str,
+    error_type: ErrorType,
+    sites: list[ErrorSite],
+    message: str,
+    suggestion: str | None = None,
+) -> ValidationError:
+    msg = message
+    if suggestion:
+        msg = f"{message} Suggestion: {suggestion}"
+    return ValidationError(name, error_type, sites, msg)
+
+
+def register_stage_validator(
+    name: str,
+    fn: StageValidatorFn,
+    *,
+    doc: str = "",
+    keywords: list[str] | None = None,
+    section: str = "",
+) -> None:
+    kw = list(keywords or [])
+    if section:
+        kw.append(f"rep0158:{section}")
+    kw.append("rep0158")
+    metadata = UsdValidation.ValidatorMetadata(
+        name=f"rep0158:{name}",
+        doc=doc,
+        keywords=kw,
+    )
+    _registry.RegisterStageValidator(metadata, fn)
+
+
+def get_validators_for_keywords(
+    keywords: list[str],
+) -> list:
+    validators = []
+    for kw in keywords:
+        metas = _registry.GetValidatorMetadataForKeyword(kw)
+        for m in metas:
+            v = _registry.GetOrLoadValidatorByName(m.name)
+            if v not in validators:
+                validators.append(v)
+    return validators
+
+
+def get_all_rep0158_validators() -> list:
+    metas = _registry.GetValidatorMetadataForKeyword("rep0158")
+    return [_registry.GetOrLoadValidatorByName(m.name) for m in metas]

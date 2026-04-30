@@ -1,6 +1,5 @@
-"""REP-0158 OpenUSD Simulation Asset Compliance Checker."""
+"""REP-0158 OpenUSD Simulation Asset Compliance Checker.
 
-from .checker import ComplianceChecker
-from .report import Report, Severity, Violation
-
-__all__ = ["ComplianceChecker", "Report", "Severity", "Violation"]
+Built on the UsdValidation framework. Validators are registered at import
+time when check modules are loaded.
+"""

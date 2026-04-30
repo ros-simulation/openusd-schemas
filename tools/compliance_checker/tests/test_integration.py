@@ -144,15 +144,15 @@ def Material "Mat" {}
 
 class TestReportOutput:
     def test_json_output_is_valid(self):
+        from compliance_checker.report import errors_to_json
+
         stage = make_stage("""
 #usda 1.0
 def Xform "Robot" {}
 """)
         errors = run_keyword(stage, "rep0158")
-        data = {
-            "violations": [{"name": e.GetName(), "message": e.GetMessage()} for e in errors],
-            "summary": {"total": len(errors)},
-        }
+        json_str = errors_to_json("test.usda", errors)
+        data = json.loads(json_str)
         assert "violations" in data
         assert "summary" in data
         assert isinstance(data["violations"], list)

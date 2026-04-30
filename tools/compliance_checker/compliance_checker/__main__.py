@@ -6,37 +6,43 @@ import logging
 import sys
 
 import click
+from pxr import Sdf, Usd, UsdValidation
 from rich.console import Console
 
-from .checker import ComplianceChecker
+from .checks import base as check_base
 from .rep_info import num, title
-from .report import Report, Severity
+from .report import _prim_path_from_error, _section_from_error, _severity_label, errors_to_json
 
 console = Console()
 err_console = Console(stderr=True)
 
-title = f"REP-{num} {title}"
+_title = f"REP-{num} {title}"
 
 _SEVERITY_STYLE = {
-    Severity.ERROR: "bold red",
-    Severity.WARNING: "yellow",
-    Severity.INFO: "dim",
+    "error": "bold red",
+    "warning": "yellow",
+    "info": "dim",
 }
 
 _SEVERITY_ICON = {
-    Severity.ERROR: "[bold red]ERROR  [/]",
-    Severity.WARNING: "[yellow]WARNING[/]",
-    Severity.INFO: "[dim]INFO   [/]",
+    "error": "[bold red]ERROR  [/]",
+    "warning": "[yellow]WARNING[/]",
+    "info": "[dim]INFO   [/]",
 }
 
+_SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 
-def _severity_from_str(value: str) -> Severity:
-    try:
-        return Severity(value.lower())
-    except ValueError:
-        raise click.BadParameter(
-            f"Unknown severity '{value}'. Choose: error, warning, info."
-        )
+
+def _ensure_checks_loaded():
+    """Import all check modules so their validators register."""
+    from .checks import (  # noqa: F401
+        s1_1_units,
+        s1_2_structure,
+        s1_3_physics,
+        s2_ros,
+        s3_export,
+        s4_extended_physics,
+    )
 
 
 @click.command(name="usd-check")
@@ -86,13 +92,6 @@ def _severity_from_str(value: str) -> Severity:
     help="Output format. (default: text)",
 )
 @click.option(
-    "--no-extensions",
-    "no_extensions",
-    is_flag=True,
-    default=False,
-    help="Disable loading of third-party extension check plug-ins.",
-)
-@click.option(
     "--verbose", "-v", is_flag=True, default=False, help="Enable debug logging."
 )
 def main(
@@ -103,7 +102,6 @@ def main(
     severity: str,
     fail_on: str,
     output_format: str,
-    no_extensions: bool,
     verbose: bool,
 ) -> None:
     """Validate a USD asset against the REP-0158 interoperability standard.
@@ -120,95 +118,129 @@ def main(
     else:
         logging.basicConfig(level=logging.WARNING)
 
-    min_severity = _severity_from_str(severity)
-    fail_severity = _severity_from_str(fail_on)
+    min_severity = severity.lower()
+    fail_severity = fail_on.lower()
+    if min_severity not in _SEVERITY_ORDER:
+        raise click.BadParameter(f"Unknown severity '{severity}'.")
+    if fail_severity not in _SEVERITY_ORDER:
+        raise click.BadParameter(f"Unknown severity '{fail_on}'.")
+
+    _ensure_checks_loaded()
 
     section_list = [s.strip() for s in sections.split(",")] if sections else None
 
     try:
-        checker = ComplianceChecker.from_path(
-            asset,
-            include_export=export,
-            include_extended=extensions,
-            sections=section_list,
-            include_extensions=not no_extensions,
-        )
-    except FileNotFoundError as exc:
+        stage = Usd.Stage.Open(asset, Usd.Stage.LoadAll)
+        if not stage:
+            raise FileNotFoundError(f"Could not open USD stage: {asset!r}")
+    except Exception as exc:
         err_console.print(f"[bold red]Error:[/] {exc}")
         sys.exit(2)
 
-    report = checker.run()
+    keywords = _build_keywords(
+        include_export=export,
+        include_extended=extensions,
+        sections=section_list,
+    )
 
-    # ------------------------------------------------------------------ #
-    # Output                                                                #
-    # ------------------------------------------------------------------ #
+    validators = check_base.get_validators_for_keywords(keywords)
+    ctx = UsdValidation.ValidationContext(validators)
+    all_errors = ctx.Validate(stage)
+
+    if section_list:
+        all_errors = [
+            e for e in all_errors
+            if any(_section_from_error(e).startswith(s) for s in section_list)
+        ]
 
     if output_format == "json":
-        # For JSON, ignore min_severity filter (output everything)
-        click.echo(report.to_json())
+        click.echo(errors_to_json(asset, all_errors))
     else:
-        _print_text_report(report, min_severity)
+        _print_text_report(asset, all_errors, min_severity)
 
-    # ------------------------------------------------------------------ #
-    # Exit code                                                             #
-    # ------------------------------------------------------------------ #
-
-    _severity_order = {Severity.ERROR: 0, Severity.WARNING: 1, Severity.INFO: 2}
     worst = min(
-        (v.severity for v in report.violations),
-        key=lambda s: _severity_order[s],
-        default=Severity.INFO,
+        (_severity_label(e) for e in all_errors),
+        key=lambda s: _SEVERITY_ORDER.get(s, 2),
+        default="info",
     )
-    if _severity_order[worst] <= _severity_order[fail_severity]:
+    if _SEVERITY_ORDER.get(worst, 2) <= _SEVERITY_ORDER[fail_severity]:
         sys.exit(1)
 
 
-def _print_text_report(report: Report, min_severity: Severity) -> None:
-    _sev_order = {Severity.ERROR: 0, Severity.WARNING: 1, Severity.INFO: 2}
-    min_order = _sev_order[min_severity]
+def _build_keywords(
+    include_export: bool,
+    include_extended: bool,
+    sections: list[str] | None,
+) -> list[str]:
+    if sections:
+        return [f"rep0158:{s}" for s in sections]
 
-    visible = [v for v in report.violations if _sev_order[v.severity] <= min_order]
+    keywords = ["rep0158"]
+    if not include_export:
+        keywords = ["rep0158:1.1", "rep0158:1.2", "rep0158:1.3",
+                     "rep0158:2.1", "rep0158:2.2", "rep0158:2.4",
+                     "rep0158:2.5", "rep0158:2.6", "rep0158:2.7",
+                     "rep0158:2.8", "rep0158:2.10"]
+        if include_extended:
+            keywords.append("rep0158:4.2")
+    elif not include_extended:
+        base = ["rep0158:1.1", "rep0158:1.2", "rep0158:1.3",
+                "rep0158:2.1", "rep0158:2.2", "rep0158:2.4",
+                "rep0158:2.5", "rep0158:2.6", "rep0158:2.7",
+                "rep0158:2.8", "rep0158:2.10",
+                "rep0158:3.1", "rep0158:3.2", "rep0158:3.3",
+                "rep0158:3.4", "rep0158:3.6"]
+        keywords = base
 
-    # Header
-    console.rule(f"[bold]{title} Compliance Report[/]")
-    console.print(f"[dim]Asset:[/] {report.asset_path}")
+    return keywords
+
+
+def _print_text_report(
+    asset_path: str,
+    errors: list,
+    min_severity: str,
+) -> None:
+    min_order = _SEVERITY_ORDER[min_severity]
+
+    visible = [e for e in errors if _SEVERITY_ORDER.get(_severity_label(e), 2) <= min_order]
+
+    n_errors = sum(1 for e in errors if _severity_label(e) == "error")
+    n_warnings = sum(1 for e in errors if _severity_label(e) == "warning")
+    n_infos = sum(1 for e in errors if _severity_label(e) == "info")
+
+    console.rule(f"[bold]{_title} Compliance Report[/]")
+    console.print(f"[dim]Asset:[/] {asset_path}")
     console.print(
-        f"[bold red]{len(report.errors)} error(s)[/]  "
-        f"[yellow]{len(report.warnings)} warning(s)[/]  "
-        f"[dim]{len(report.infos)} info[/]  "
-        f"({'[green]PASSED[/]' if not report.has_errors() else '[red]FAILED[/]'})"
+        f"[bold red]{n_errors} error(s)[/]  "
+        f"[yellow]{n_warnings} warning(s)[/]  "
+        f"[dim]{n_infos} info[/]  "
+        f"({'[green]PASSED[/]' if n_errors == 0 else '[red]FAILED[/]'})"
     )
 
     if not visible:
         console.print("\n[green]No violations at the selected severity level.[/]")
         return
 
-    # Group by section
-    by_section = {}
-    for v in visible:
-        by_section.setdefault(v.section, []).append(v)
+    by_section: dict[str, list] = {}
+    for e in visible:
+        sec = _section_from_error(e)
+        by_section.setdefault(sec, []).append(e)
 
     for section_key in sorted(by_section):
         console.print(f"\n[bold]§{section_key}[/]")
-        for v in by_section[section_key]:
-            style = _SEVERITY_STYLE[v.severity]
-            icon = _SEVERITY_ICON[v.severity]
-            console.print(f"  {icon} [{style}][{v.check_id}][/]  [dim]{v.prim_path}[/]")
-            # Print dynamic text with markup disabled to avoid Rich parsing
-            # characters like '[' and ']' in violation content.
-            console.print(f"         {v.message}", markup=False)
-            if v.suggestion:
-                console.print(
-                    f"         Suggestion: {v.suggestion}",
-                    style="italic dim",
-                    markup=False,
-                )
+        for e in by_section[section_key]:
+            sev = _severity_label(e)
+            style = _SEVERITY_STYLE[sev]
+            icon = _SEVERITY_ICON[sev]
+            prim_path = _prim_path_from_error(e)
+            check_id = e.GetName()
+            console.print(f"  {icon} [{style}][{check_id}][/]  [dim]{prim_path}[/]")
+            console.print(f"         {e.GetMessage()}", markup=False)
 
-    # Footer summary
     console.rule()
     console.print(
-        f"[dim]Checks run against:[/] {report.asset_path}\n"
-        f"[dim]Violations shown (>= {min_severity.value}):[/] {len(visible)} of {len(report.violations)}"
+        f"[dim]Checks run against:[/] {asset_path}\n"
+        f"[dim]Violations shown (>= {min_severity}):[/] {len(visible)} of {len(errors)}"
     )
 
 
