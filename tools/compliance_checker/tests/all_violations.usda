@@ -1,0 +1,200 @@
+#usda 1.0
+(
+    defaultPrim = "Robot"
+    upAxis = "Y"
+    metersPerUnit = 0.01
+    kilogramsPerUnit = 0.001
+)
+
+class "BaseClass" {}
+
+def Xform "Robot" (
+    kind = "component"
+    prepend apiSchemas = ["RosContextAPI", "PhysicsArticulationRootAPI"]
+    prepend variantSets = "mode"
+    payload = @./heavy_payload.usda@
+) {
+    float xformOp:rotateX = -90
+    uniform token[] xformOpOrder = ["xformOp:rotateX"]
+
+    string ros:context:namespace = "root_ns"
+    custom string mysim:prefabPath = "dynamic_spawn_asset.usd"
+
+    variantSet "mode" = {
+        "a" {}
+        "b" {}
+    }
+
+    def Xform "NestedComponent" (
+        kind = "component"
+    ) {}
+
+    def Xform "NestedContextInPayload" (
+        prepend apiSchemas = ["RosContextAPI"]
+    ) {
+        string ros:context:namespace = "nested"
+        string ros:context:parent_frame = "world"
+
+        def Xform "TopicInsidePayload" (
+            prepend apiSchemas = ["RosTopicAPI"]
+        ) {
+            token ros:topic:role = "publisher"
+            string ros:topic:name = "inside_payload"
+            string ros:topic:type = "std_msgs/msg/String"
+            double ros:topic:publish_rate = 10.0
+        }
+    }
+
+    def Xform "BadTopicMissingRole" (
+        prepend apiSchemas = ["RosTopicAPI"]
+    ) {
+        string ros:topic:name = "bad name"
+        string ros:topic:type = "std_msgs/msg/String"
+        double ros:topic:publish_rate = 10.0
+    }
+
+    def Xform "BadTopicMissingName" (
+        prepend apiSchemas = ["RosTopicAPI"]
+    ) {
+        token ros:topic:role = "publisher"
+        string ros:topic:type = "std_msgs/msg/String"
+        double ros:topic:publish_rate = 10.0
+    }
+
+    def Xform "BadTopicMissingType" (
+        prepend apiSchemas = ["RosTopicAPI"]
+    ) {
+        token ros:topic:role = "publisher"
+        string ros:topic:name = "no_type"
+        double ros:topic:publish_rate = 10.0
+    }
+
+    def Xform "BadTopicMissingRate" (
+        prepend apiSchemas = ["RosTopicAPI"]
+    ) {
+        token ros:topic:role = "publisher"
+        string ros:topic:name = "no_rate"
+        string ros:topic:type = "std_msgs/msg/String"
+    }
+
+    def Xform "BadTopicQoS" (
+        prepend apiSchemas = ["RosTopicAPI"]
+    ) {
+        token ros:topic:role = "publisher"
+        string ros:topic:name = "qos_bad"
+        string ros:topic:type = "std_msgs/msg/String"
+        double ros:topic:publish_rate = 10.0
+        token ros:topic:qos:reliability = "turbo"
+        token ros:topic:qos:durability = "immortal"
+        token ros:topic:qos:history = "discard"
+    }
+
+    def Xform "ClockTopic" (
+        prepend apiSchemas = ["RosTopicAPI"]
+    ) {
+        token ros:topic:role = "publisher"
+        string ros:topic:name = "/clock"
+        string ros:topic:type = "rosgraph_msgs/msg/Clock"
+        double ros:topic:publish_rate = 100.0
+    }
+
+    def Xform "BadServiceMissingRole" (
+        prepend apiSchemas = ["RosServiceAPI"]
+    ) {
+        string ros:service:name = "set_led"
+        string ros:service:type = "std_srvs/srv/SetBool"
+    }
+
+    def Xform "BadServiceProhibitedType" (
+        prepend apiSchemas = ["RosServiceAPI"]
+    ) {
+        token ros:service:role = "server"
+        string ros:service:name = "spawn_entity"
+        string ros:service:type = "simulation_interfaces/srv/SpawnEntity"
+    }
+
+    def Xform "BadActionMissingType" (
+        prepend apiSchemas = ["RosActionAPI"]
+    ) {
+        token ros:action:role = "server"
+        string ros:action:name = "follow_trajectory"
+    }
+
+    def Xform "FrameAndRigidBody" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "RosFrameAPI"]
+    ) {}
+
+    def Camera "CameraWithTopicOnSelf" (
+        prepend apiSchemas = ["RosTopicAPI"]
+    ) {
+        token ros:topic:role = "publisher"
+        string ros:topic:name = "camera_image"
+        string ros:topic:type = "sensor_msgs/msg/Image"
+        double ros:topic:publish_rate = 30.0
+    }
+
+    def PhysicsRevoluteJoint "JointNoLimits" {}
+
+    def PhysicsPrismaticJoint "SlideNoLimits" {}
+
+    def PhysicsFixedJoint "MimicFixed" (
+        prepend apiSchemas = ["MimicJointAPI"]
+        instanceable = true
+    ) {}
+
+    def Xform "ZeroMassBody" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+    ) {
+        float physics:mass = 0.0
+    }
+
+    def Xform "InstanceableRigidBody" (
+        prepend apiSchemas = ["PhysicsRigidBodyAPI"]
+        instanceable = true
+    ) {}
+
+    def Mesh "CollisionNoMaterial" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    ) {
+        token purpose = "guide"
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(0,0,0), (1,0,0), (1,1,0), (0,1,0)]
+    }
+
+    def Mesh "LeftHandedDoubleSidedMesh" {
+        uniform token orientation = "leftHanded"
+        uniform bool doubleSided = true
+        int[] faceVertexCounts = [3]
+        int[] faceVertexIndices = [0, 1, 2]
+        point3f[] points = [(0,0,0), (1,0,0), (0,1,0)]
+    }
+
+    def Material "MatWithoutSurface" {}
+
+    def Shader "BadTextureShader" {
+        uniform token info:id = "UsdUVTexture"
+        asset inputs:file = @./textures/albedo.<UDIM>.exr@
+        float3 outputs:rgb
+    }
+}
+
+def Xform "SecondArticulationRoot" (
+    prepend apiSchemas = ["PhysicsArticulationRootAPI"]
+) {}
+
+def Xform "OmniRef" (
+    references = @omniverse://server.example.com/some_asset.usd@
+) {}
+
+def Xform "AbsoluteRef" (
+    references = @/tmp/not-portable.usd@
+) {}
+
+def Xform "InheritPrim" (
+    inherits = </BaseClass>
+) {}
+
+def Xform "SpecializePrim" (
+    specializes = </BaseClass>
+) {}
