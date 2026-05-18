@@ -62,7 +62,7 @@
             },
             "LibraryPath": "",
             "Name": "usdRos",
-            "ResourcePath": "../resources",
+            "ResourcePath": ".",
             "Root": ".",
             "Type": "resource"
         },

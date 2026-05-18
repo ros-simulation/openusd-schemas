@@ -11,18 +11,7 @@ if TYPE_CHECKING:
     pass
 
 
-def _ensure_checks_loaded():
-    """Import all check modules so their validators register."""
-    from compliance_checker.checks import (  # noqa: F401
-        s1_1_units,
-        s1_2_structure,
-        s1_3_physics,
-        s2_ros,
-        s3_export,
-    )
-
-
-_ensure_checks_loaded()
+import usdRosValidators  # noqa: F401
 
 
 # ------------------------------------------------------------------ #

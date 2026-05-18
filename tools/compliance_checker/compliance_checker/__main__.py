@@ -33,17 +33,6 @@ _SEVERITY_ICON = {
 _SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 
 
-def _ensure_checks_loaded():
-    """Import all check modules so their validators register."""
-    from .checks import (  # noqa: F401
-        s1_1_units,
-        s1_2_structure,
-        s1_3_physics,
-        s2_ros,
-        s3_export,
-    )
-
-
 @click.command(name="usd-check")
 @click.argument("asset", type=click.Path(exists=True, readable=True))
 @click.option(
@@ -111,8 +100,6 @@ def main(
         raise click.BadParameter(f"Unknown severity '{severity}'.")
     if fail_severity not in _SEVERITY_ORDER:
         raise click.BadParameter(f"Unknown severity '{fail_on}'.")
-
-    _ensure_checks_loaded()
 
     section_list = [s.strip() for s in sections.split(",")] if sections else None
 

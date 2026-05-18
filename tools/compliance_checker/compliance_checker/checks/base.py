@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
-from pxr import Plug, Sdf, UsdValidation
+from pxr import Sdf, UsdValidation
 
 if TYPE_CHECKING:
     from pxr import Usd
-
-# Register the codeless ROS schema plugin so that prim.HasAPI() and
-# Usd.SchemaRegistry work for RosContextAPI, RosTopicAPI, etc.
-_SCHEMA_PLUGIN = Path(__file__).resolve().parents[4] / "core" / "ros" / "plugin" / "resource"
-if _SCHEMA_PLUGIN.is_dir():
-    Plug.Registry().RegisterPlugins(str(_SCHEMA_PLUGIN))
 
 _registry = UsdValidation.ValidationRegistry()
 

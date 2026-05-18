@@ -17,6 +17,9 @@ dev = ["pytest>=9.0.3"]
 [tool.setuptools.packages.find]
 include = ["compliance_checker*", "usdRosValidators*"]
 
+[tool.setuptools.package-data]
+usdRosValidators = ["plugInfo.json", "generatedSchema.usda"]
+
 [tool.uv]
 package = true
 
