@@ -37,23 +37,14 @@ physics, and the five base ROS schemas — `RosContextAPI`, `RosTopicAPI`,
 | Flag           | What it adds                                                  |
 | -------------- | ------------------------------------------------------------- |
 | _(default)_    | §1 units/structure/physics + §2 core ROS schemas              |
-| `--extensions` | §4 extension schemas: `ExtendedPhysics*`, `RosControl*`       |
 | `--export`     | §3 export/conversion checks (mesh, texture, material; slower) |
-
-Flags are independent and can be combined:
 
 ```bash
 # Core checks only (default)
 usd-check robot.usda
 
-# Core + extension schema checks
-usd-check robot.usda --extensions
-
 # Core + export checks
 usd-check robot.usda --export
-
-# Everything
-usd-check robot.usda --extensions --export
 ```
 
 ## Developer Setup

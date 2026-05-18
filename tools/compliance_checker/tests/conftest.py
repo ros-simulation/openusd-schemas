@@ -19,7 +19,6 @@ def _ensure_checks_loaded():
         s1_3_physics,
         s2_ros,
         s3_export,
-        s4_extended_physics,
     )
 
 

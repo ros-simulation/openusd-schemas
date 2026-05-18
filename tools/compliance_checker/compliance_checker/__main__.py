@@ -41,21 +41,11 @@ def _ensure_checks_loaded():
         s1_3_physics,
         s2_ros,
         s3_export,
-        s4_extended_physics,
     )
 
 
 @click.command(name="usd-check")
 @click.argument("asset", type=click.Path(exists=True, readable=True))
-@click.option(
-    "--extensions",
-    is_flag=True,
-    default=False,
-    help=(
-        "Include §4 extension schema checks: ExtendedPhysics* and RosControl* schemas. "
-        "By default only core §1/§2 checks run."
-    ),
-)
 @click.option(
     "--export",
     is_flag=True,
@@ -96,7 +86,6 @@ def _ensure_checks_loaded():
 )
 def main(
     asset: str,
-    extensions: bool,
     export: bool,
     sections: str | None,
     severity: str,
@@ -109,9 +98,7 @@ def main(
     ASSET is the path to a .usd / .usda / .usdc file.
 
     By default only the core §1 (units, structure, physics) and §2 (base ROS
-    schemas) checks run.  Use --extensions to also validate §4 extension schemas
-    (ExtendedPhysics*, RosControl*) and --export to add §3 export/conversion
-    checks.
+    schemas) checks run.  Use --export to also add §3 export/conversion checks.
     """
     if verbose:
         logging.basicConfig(level=logging.DEBUG)
@@ -139,7 +126,6 @@ def main(
 
     keywords = _build_keywords(
         include_export=export,
-        include_extended=extensions,
         sections=section_list,
     )
 
@@ -169,30 +155,19 @@ def main(
 
 def _build_keywords(
     include_export: bool,
-    include_extended: bool,
     sections: list[str] | None,
 ) -> list[str]:
     if sections:
         return [f"rep0158:{s}" for s in sections]
 
-    keywords = ["rep0158"]
-    if not include_export:
-        keywords = ["rep0158:1.1", "rep0158:1.2", "rep0158:1.3",
-                     "rep0158:2.1", "rep0158:2.2", "rep0158:2.4",
-                     "rep0158:2.5", "rep0158:2.6", "rep0158:2.7",
-                     "rep0158:2.8", "rep0158:2.10"]
-        if include_extended:
-            keywords.append("rep0158:4.2")
-    elif not include_extended:
-        base = ["rep0158:1.1", "rep0158:1.2", "rep0158:1.3",
-                "rep0158:2.1", "rep0158:2.2", "rep0158:2.4",
-                "rep0158:2.5", "rep0158:2.6", "rep0158:2.7",
-                "rep0158:2.8", "rep0158:2.10",
-                "rep0158:3.1", "rep0158:3.2", "rep0158:3.3",
-                "rep0158:3.4", "rep0158:3.6"]
-        keywords = base
-
-    return keywords
+    core = ["rep0158:1.1", "rep0158:1.2", "rep0158:1.3",
+            "rep0158:2.1", "rep0158:2.2", "rep0158:2.4",
+            "rep0158:2.5", "rep0158:2.6", "rep0158:2.7",
+            "rep0158:2.8", "rep0158:2.10"]
+    if include_export:
+        core += ["rep0158:3.1", "rep0158:3.2", "rep0158:3.3",
+                 "rep0158:3.4", "rep0158:3.6"]
+    return core
 
 
 def _print_text_report(
