@@ -8,7 +8,7 @@ from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
 from .base import (
     ErrorType, TimeRange, _error, _prim_site, _site, _stage_site,
-    register_prim_validator, register_stage_validator,
+    register_plugin_prim_validator, register_plugin_stage_validator,
 )
 from ._tokens import (
     COLLISION_GEOMETRY_AUTHORING,
@@ -51,12 +51,7 @@ def _check_joint_limits(prim: Usd.Prim, timeRange: TimeRange):
         )
 
 
-register_prim_validator(
-    "JointLimits", _check_joint_limits,
-    doc="REP §1.3: Non-continuous joints must author explicit limit attributes.",
-    section="1.3",
-    schema_types=["UsdPhysicsRevoluteJoint", "UsdPhysicsPrismaticJoint"],
-)
+register_plugin_prim_validator("JointLimits", _check_joint_limits)
 
 
 def _check_mass_properties(prim: Usd.Prim, timeRange: TimeRange):
@@ -80,12 +75,7 @@ def _check_mass_properties(prim: Usd.Prim, timeRange: TimeRange):
         )
 
 
-register_prim_validator(
-    "MassProperties", _check_mass_properties,
-    doc="REP §1.3: Dynamic bodies must have mass > 0; no zero-mass hack.",
-    section="1.3",
-    schema_types=["UsdPhysicsRigidBodyAPI"],
-)
+register_plugin_prim_validator("MassProperties", _check_mass_properties)
 
 
 _CM_REQUIRED_ATTRS = (
@@ -125,12 +115,7 @@ def _check_collision_material(prim: Usd.Prim, timeRange: TimeRange):
             )
 
 
-register_prim_validator(
-    "CollisionMaterial", _check_collision_material,
-    doc="REP §1.3.4: Collision geometry must bind a physics material with friction/restitution.",
-    section="1.3",
-    schema_types=["UsdPhysicsCollisionAPI"],
-)
+register_plugin_prim_validator("CollisionMaterial", _check_collision_material)
 
 
 def _check_collision_geometry_authoring(prim: Usd.Prim, timeRange: TimeRange):
@@ -158,12 +143,7 @@ def _check_collision_geometry_authoring(prim: Usd.Prim, timeRange: TimeRange):
         )
 
 
-register_prim_validator(
-    "CollisionGeometryAuthoring", _check_collision_geometry_authoring,
-    doc="REP §1.3.1: Collision geometry should use guide purpose and none approximation.",
-    section="1.3",
-    schema_types=["UsdPhysicsCollisionAPI"],
-)
+register_plugin_prim_validator("CollisionGeometryAuthoring", _check_collision_geometry_authoring)
 
 
 # -- Stage-level validators (need cross-prim context) ---------------------
@@ -183,11 +163,7 @@ def _check_articulation_root(stage: Usd.Stage, timeRange: TimeRange):
         )
 
 
-register_stage_validator(
-    "ArticulationRoot", _check_articulation_root,
-    doc="REP §1.3: At most one ArticulationRootAPI per connected kinematic tree.",
-    section="1.3",
-)
+register_plugin_stage_validator("ArticulationRoot", _check_articulation_root)
 
 
 _MIMIC_ALLOWED_TYPES = {"PhysicsRevoluteJoint", "PhysicsPrismaticJoint"}
@@ -289,11 +265,7 @@ def _check_mimic_cycle_free(graph, stage):
         yield from dfs(node, [])
 
 
-register_stage_validator(
-    "MimicJoint", _check_mimic_joint,
-    doc="REP §1.3: MimicJointAPI is deprecated; assets must use ExtendedPhysicsMimicAPI.",
-    section="1.3",
-)
+register_plugin_stage_validator("MimicJoint", _check_mimic_joint)
 
 
 _IP_FORBIDDEN_APIS = {
@@ -327,8 +299,4 @@ def _check_instanceable_physics(stage: Usd.Stage, timeRange: TimeRange):
             )
 
 
-register_stage_validator(
-    "InstanceablePhysics", _check_instanceable_physics,
-    doc="REP §1.2.6: instanceable=true must not be set on physics/ROS prims.",
-    section="1.3",
-)
+register_plugin_stage_validator("InstanceablePhysics", _check_instanceable_physics)

@@ -22,7 +22,7 @@ from compliance_checker.checks._tokens import (
 
 from .conftest import has, make_stage, none_with, run_validators
 
-_V = "rep0158:CoordinateSystem"
+_V = "usdRosValidators:CoordinateSystem"
 
 # ------------------------------------------------------------------ #
 # §1.1.1 – metersPerUnit                                               #

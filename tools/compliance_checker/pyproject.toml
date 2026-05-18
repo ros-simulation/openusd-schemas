@@ -15,7 +15,7 @@ dependencies = [
 dev = ["pytest>=9.0.3"]
 
 [tool.setuptools.packages.find]
-include = ["compliance_checker*"]
+include = ["compliance_checker*", "usdRosValidators*"]
 
 [tool.uv]
 package = true

@@ -7,7 +7,7 @@ import re
 
 from pxr import Usd, UsdGeom, UsdShade
 
-from .base import ErrorType, TimeRange, _error, _prim_site, register_stage_validator
+from .base import ErrorType, TimeRange, _error, _prim_site, register_plugin_stage_validator
 from ._tokens import (
     COLLISION_NOT_TRIANGULATED,
     COMPLEX_AREA_LIGHT,
@@ -225,28 +225,8 @@ def _validate_lighting_portability(stage: Usd.Stage, timeRange: TimeRange):
         )
 
 
-register_stage_validator(
-    "MaterialPortability", _validate_material_portability,
-    doc="REP §3.1: Materials must use UsdPreviewSurface as the normative surface.",
-    keywords=["rep0158:export"], section="3.1",
-)
-register_stage_validator(
-    "TextureFormat", _validate_texture_format,
-    doc="REP §3.1 / §3.2: Validate texture file formats; flag UDIM tiles and forbidden formats.",
-    keywords=["rep0158:export"], section="3.2",
-)
-register_stage_validator(
-    "GeometryConstraints", _validate_geometry_constraints,
-    doc="REP §3.4: Collision meshes must be triangulated; meshes must be rightHanded.",
-    keywords=["rep0158:export"], section="3.4",
-)
-register_stage_validator(
-    "TextureBaking", _validate_texture_baking,
-    doc="REP §3.3: Procedural texture graphs should be baked to image/primvar data.",
-    keywords=["rep0158:export"], section="3.3",
-)
-register_stage_validator(
-    "LightingPortability", _validate_lighting_portability,
-    doc="REP §3.6: avoid complex area lights for interoperable assets.",
-    keywords=["rep0158:export"], section="3.6",
-)
+register_plugin_stage_validator("MaterialPortability", _validate_material_portability)
+register_plugin_stage_validator("TextureFormat", _validate_texture_format)
+register_plugin_stage_validator("GeometryConstraints", _validate_geometry_constraints)
+register_plugin_stage_validator("TextureBaking", _validate_texture_baking)
+register_plugin_stage_validator("LightingPortability", _validate_lighting_portability)

@@ -8,7 +8,7 @@ from pxr import Sdf, Usd, UsdGeom, UsdPhysics
 
 from .base import (
     ErrorType, TimeRange, _error, _prim_site, _site as _base_site,
-    register_prim_validator, register_stage_validator,
+    register_plugin_prim_validator, register_plugin_stage_validator,
 )
 from ._tokens import (
     CAMERA_OPTICAL_FRAME, CONTEXT_INSIDE_PAYLOAD, FRAME_ON_RIGID_BODY,
@@ -139,8 +139,7 @@ def _validate_ros_context_placement(stage: Usd.Stage, timeRange: TimeRange):
                     "This attribute will be ignored.",
                     "Remove ros:context:parent_frame from all contexts except the top-most one.")
 
-register_stage_validator("RosContextPlacement", _validate_ros_context_placement,
-    doc="REP §2.1: RosContextAPI prims must reside outside payload arcs.", section="2.1")
+register_plugin_stage_validator("RosContextPlacement", _validate_ros_context_placement)
 
 
 # --- §2.2 RosInterfacePlacement ---
@@ -160,8 +159,7 @@ def _validate_ros_interface_placement(stage: Usd.Stage, timeRange: TimeRange):
                     "Move the prim (or its schema) above the payload boundary, "
                     "following the ETL pattern from §1.2.1.")
 
-register_stage_validator("RosInterfacePlacement", _validate_ros_interface_placement,
-    doc="REP §2.2: Interface prims must reside outside payload arcs.", section="2.2")
+register_plugin_stage_validator("RosInterfacePlacement", _validate_ros_interface_placement)
 
 
 # --- §2.2 RosInterfaceStructure ---
@@ -197,8 +195,7 @@ def _validate_ros_interface_structure(stage: Usd.Stage, timeRange: TimeRange):
                     "on a direct child UsdGeomXform of the physical link per REP §2.2.",
                     "Place this interface on a direct child Xform under the rigid body link.")
 
-register_stage_validator("RosInterfaceStructure", _validate_ros_interface_structure,
-    doc="REP §2.2: interface prim structure for robot-wide and sensor interfaces.", section="2.2")
+register_plugin_stage_validator("RosInterfaceStructure", _validate_ros_interface_structure)
 
 
 # --- §2.4 RosTopic ---
@@ -333,9 +330,7 @@ def _check_topic(prim: Usd.Prim, timeRange: TimeRange):
                     "Use a valid ROS frame name (e.g. 'map', 'earth', '/robot/base_link').")
 
 
-register_prim_validator("RosTopic", _check_topic,
-    doc="REP §2.4: Validate RosTopicAPI required attributes and QoS values.",
-    section="2.4", schema_types=["UsdRosTopicAPI"])
+register_plugin_prim_validator("RosTopic", _check_topic)
 
 
 # --- §2.5 RosService ---
@@ -389,9 +384,7 @@ def _check_service(prim: Usd.Prim, timeRange: TimeRange):
                 "Use `bool ros:service:starts_enabled = true|false`.")
 
 
-register_prim_validator("RosService", _check_service,
-    doc="REP §2.5: Validate RosServiceAPI required attributes.",
-    section="2.5", schema_types=["UsdRosServiceAPI"])
+register_plugin_prim_validator("RosService", _check_service)
 
 
 # --- §2.6 RosAction ---
@@ -434,9 +427,7 @@ def _check_action(prim: Usd.Prim, timeRange: TimeRange):
                 "Use `bool ros:action:starts_enabled = true|false`.")
 
 
-register_prim_validator("RosAction", _check_action,
-    doc="REP §2.6: Validate RosActionAPI required attributes.",
-    section="2.6", schema_types=["UsdRosActionAPI"])
+register_plugin_prim_validator("RosAction", _check_action)
 
 
 # --- §2.7 RosFrameAPI ---
@@ -450,9 +441,7 @@ def _check_ros_frame_api(prim: Usd.Prim, timeRange: TimeRange):
             "Remove RosFrameAPI from prims that already carry PhysicsRigidBodyAPI. "
             "Use RosFrameAPI only for non-physical dummy frames.")
 
-register_prim_validator("RosFrameAPI", _check_ros_frame_api,
-    doc="REP §2.7: RosFrameAPI should not duplicate implicit TF.",
-    section="2.7", schema_types=["UsdRosFrameAPI"])
+register_plugin_prim_validator("RosFrameAPI", _check_ros_frame_api)
 
 
 # --- §2.7 RosFrameAttributes ---
@@ -482,9 +471,7 @@ def _check_ros_frame_attributes(prim: Usd.Prim, timeRange: TimeRange):
                 f"'ros:frame:static' on '{pp}' must be a bool. Got {type(fs_val).__name__}.",
                 "Use `bool ros:frame:static = true|false`.")
 
-register_prim_validator("RosFrameAttributes", _check_ros_frame_attributes,
-    doc="REP §2.7: Validate RosFrameAPI attribute types and frame-id naming.",
-    section="2.7", schema_types=["UsdRosFrameAPI"])
+register_plugin_prim_validator("RosFrameAttributes", _check_ros_frame_attributes)
 
 
 # --- §2.8 CameraOpticalFrame ---
@@ -521,8 +508,7 @@ def _validate_camera_optical_frame(stage: Usd.Stage, timeRange: TimeRange):
                     "Add `float xformOp:rotateX = 180` and include 'xformOp:rotateX' "
                     "in xformOpOrder on the optical frame prim.")
 
-register_stage_validator("CameraOpticalFrame", _validate_camera_optical_frame,
-    doc="REP §2.8: Camera ROS interfaces must live on an optical frame child.", section="2.8")
+register_plugin_stage_validator("CameraOpticalFrame", _validate_camera_optical_frame)
 
 
 # --- §2.10 RosJointName ---
@@ -538,10 +524,4 @@ def _check_ros_joint_name(prim: Usd.Prim, timeRange: TimeRange):
             'Add `custom string ros:joint:name = "<joint_name>"` on this prim '
             "to ensure correct mapping in JointState messages and ros2_control.")
 
-register_prim_validator("RosJointName", _check_ros_joint_name,
-    doc="REP §2.10: All UsdPhysicsJoint prims should carry ros:joint:name.",
-    section="2.10", schema_types=[
-        "UsdPhysicsRevoluteJoint", "UsdPhysicsPrismaticJoint",
-        "UsdPhysicsFixedJoint", "UsdPhysicsSphericalJoint",
-        "UsdPhysicsDistanceJoint", "UsdPhysicsJoint",
-    ])
+register_plugin_prim_validator("RosJointName", _check_ros_joint_name)

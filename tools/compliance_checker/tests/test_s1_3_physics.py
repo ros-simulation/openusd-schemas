@@ -33,7 +33,7 @@ class TestJointLimits:
 #usda 1.0
 def PhysicsRevoluteJoint "elbow_joint" {}
 """)
-        v = run_validators(stage, "rep0158:JointLimits")
+        v = run_validators(stage, "usdRosValidators:JointLimits")
         assert sum(1 for x in v if x.GetName() == MISSING_JOINT_LIMITS) == 2
 
     def test_revolute_joint_missing_lower_limit_gives_error(self):
@@ -43,7 +43,7 @@ def PhysicsRevoluteJoint "elbow_joint" {
     float physics:upperLimit = 3.14
 }
 """)
-        v = run_validators(stage, "rep0158:JointLimits")
+        v = run_validators(stage, "usdRosValidators:JointLimits")
         assert has(v, MISSING_JOINT_LIMITS)
         assert any("lowerLimit" in x.GetMessage() for x in v)
 
@@ -54,7 +54,7 @@ def PhysicsRevoluteJoint "elbow_joint" {
     float physics:lowerLimit = -3.14
 }
 """)
-        v = run_validators(stage, "rep0158:JointLimits")
+        v = run_validators(stage, "usdRosValidators:JointLimits")
         assert has(v, MISSING_JOINT_LIMITS)
         assert any("upperLimit" in x.GetMessage() for x in v)
 
@@ -66,14 +66,14 @@ def PhysicsRevoluteJoint "elbow_joint" {
     float physics:upperLimit = 1.57
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:JointLimits"), MISSING_JOINT_LIMITS)
+        assert none_with(run_validators(stage, "usdRosValidators:JointLimits"), MISSING_JOINT_LIMITS)
 
     def test_prismatic_joint_missing_limits_gives_errors(self):
         stage = make_stage("""
 #usda 1.0
 def PhysicsPrismaticJoint "slide_joint" {}
 """)
-        v = run_validators(stage, "rep0158:JointLimits")
+        v = run_validators(stage, "usdRosValidators:JointLimits")
         assert sum(1 for x in v if x.GetName() == MISSING_JOINT_LIMITS) == 2
 
     def test_prismatic_joint_with_limits_no_violation(self):
@@ -84,7 +84,7 @@ def PhysicsPrismaticJoint "slide_joint" {
     float physics:upperLimit = 0.5
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:JointLimits"), MISSING_JOINT_LIMITS)
+        assert none_with(run_validators(stage, "usdRosValidators:JointLimits"), MISSING_JOINT_LIMITS)
 
     def test_fixed_joint_no_limits_required(self):
         """Fixed joints do not have positional degrees of freedom – no limit check."""
@@ -92,7 +92,7 @@ def PhysicsPrismaticJoint "slide_joint" {
 #usda 1.0
 def PhysicsFixedJoint "world_joint" {}
 """)
-        assert none_with(run_validators(stage, "rep0158:JointLimits"), MISSING_JOINT_LIMITS)
+        assert none_with(run_validators(stage, "usdRosValidators:JointLimits"), MISSING_JOINT_LIMITS)
 
 
 # ------------------------------------------------------------------ #
@@ -108,7 +108,7 @@ def Xform "Robot" (
     prepend apiSchemas = ["PhysicsArticulationRootAPI"]
 ) {}
 """)
-        assert none_with(run_validators(stage, "rep0158:ArticulationRoot"), MULTIPLE_ARTICULATION_ROOTS)
+        assert none_with(run_validators(stage, "usdRosValidators:ArticulationRoot"), MULTIPLE_ARTICULATION_ROOTS)
 
     def test_two_roots_gives_warning(self):
         stage = make_stage("""
@@ -121,14 +121,14 @@ def Xform "Gripper" (
     prepend apiSchemas = ["PhysicsArticulationRootAPI"]
 ) {}
 """)
-        assert has(run_validators(stage, "rep0158:ArticulationRoot"), MULTIPLE_ARTICULATION_ROOTS)
+        assert has(run_validators(stage, "usdRosValidators:ArticulationRoot"), MULTIPLE_ARTICULATION_ROOTS)
 
     def test_no_articulation_root_no_violation(self):
         stage = make_stage("""
 #usda 1.0
 def Xform "Robot" {}
 """)
-        assert none_with(run_validators(stage, "rep0158:ArticulationRoot"), MULTIPLE_ARTICULATION_ROOTS)
+        assert none_with(run_validators(stage, "usdRosValidators:ArticulationRoot"), MULTIPLE_ARTICULATION_ROOTS)
 
 
 # ------------------------------------------------------------------ #
@@ -146,7 +146,7 @@ def Xform "Base" (
     float physics:mass = 0.0
 }
 """)
-        assert has(run_validators(stage, "rep0158:MassProperties"), NON_POSITIVE_MASS)
+        assert has(run_validators(stage, "usdRosValidators:MassProperties"), NON_POSITIVE_MASS)
 
     def test_positive_mass_rigid_body_no_violation(self):
         stage = make_stage("""
@@ -157,7 +157,7 @@ def Xform "Base" (
     float physics:mass = 5.0
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:MassProperties"), NON_POSITIVE_MASS)
+        assert none_with(run_validators(stage, "usdRosValidators:MassProperties"), NON_POSITIVE_MASS)
 
     def test_rigid_body_without_mass_api_no_violation(self):
         """RigidBodyAPI without MassAPI – no mass to check."""
@@ -167,7 +167,7 @@ def Xform "Base" (
     prepend apiSchemas = ["PhysicsRigidBodyAPI"]
 ) {}
 """)
-        assert none_with(run_validators(stage, "rep0158:MassProperties"), NON_POSITIVE_MASS)
+        assert none_with(run_validators(stage, "usdRosValidators:MassProperties"), NON_POSITIVE_MASS)
 
     def test_non_zero_mass_various_values_no_violation(self):
         for mass in ("0.001", "100.0", "1e3"):
@@ -179,7 +179,7 @@ def Xform "Base" (
     float physics:mass = {mass}
 }}
 """)
-            assert none_with(run_validators(stage, "rep0158:MassProperties"), NON_POSITIVE_MASS), (
+            assert none_with(run_validators(stage, "usdRosValidators:MassProperties"), NON_POSITIVE_MASS), (
                 f"Unexpected violation for mass={mass}"
             )
 
@@ -192,7 +192,7 @@ def Xform "Base" (
     float physics:mass = -1.0
 }
 """)
-        assert has(run_validators(stage, "rep0158:MassProperties"), NON_POSITIVE_MASS)
+        assert has(run_validators(stage, "usdRosValidators:MassProperties"), NON_POSITIVE_MASS)
 
 
 # ------------------------------------------------------------------ #
@@ -212,7 +212,7 @@ def Mesh "Collider" (
     point3f[] points = [(0,0,0), (1,0,0), (0,1,0)]
 }
 """)
-        assert has(run_validators(stage, "rep0158:CollisionMaterial"), COLLISION_MISSING_MATERIAL)
+        assert has(run_validators(stage, "usdRosValidators:CollisionMaterial"), COLLISION_MISSING_MATERIAL)
 
     def test_collision_with_complete_material_no_violation(self):
         stage = make_stage("""
@@ -234,7 +234,7 @@ def Material "PhysMat" (
     float physics:restitution = 0.0
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:CollisionMaterial"), COLLISION_MISSING_MATERIAL)
+        assert none_with(run_validators(stage, "usdRosValidators:CollisionMaterial"), COLLISION_MISSING_MATERIAL)
 
     def test_material_missing_restitution_gives_warning(self):
         stage = make_stage("""
@@ -255,7 +255,7 @@ def Material "PhysMat" (
     float physics:dynamicFriction = 0.3
 }
 """)
-        v = run_validators(stage, "rep0158:CollisionMaterial")
+        v = run_validators(stage, "usdRosValidators:CollisionMaterial")
         assert has(v, COLLISION_MISSING_MATERIAL)
         assert any("restitution" in x.GetMessage() for x in v)
 
@@ -278,7 +278,7 @@ def Mesh "Collider" (
     point3f[] points = [(0,0,0), (1,0,0), (0,1,0)]
 }
 """)
-        assert has(run_validators(stage, "rep0158:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
+        assert has(run_validators(stage, "usdRosValidators:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
 
     def test_collision_without_none_approximation_gives_warning(self):
         stage = make_stage("""
@@ -293,7 +293,7 @@ def Mesh "Collider" (
     point3f[] points = [(0,0,0), (1,0,0), (0,1,0)]
 }
 """)
-        assert has(run_validators(stage, "rep0158:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
+        assert has(run_validators(stage, "usdRosValidators:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
 
     def test_collision_with_guide_and_none_no_violation(self):
         stage = make_stage("""
@@ -308,7 +308,7 @@ def Mesh "Collider" (
     point3f[] points = [(0,0,0), (1,0,0), (0,1,0)]
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
+        assert none_with(run_validators(stage, "usdRosValidators:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
 
     def test_non_collision_mesh_not_flagged(self):
         stage = make_stage("""
@@ -320,7 +320,7 @@ def Mesh "Visual" {
     point3f[] points = [(0,0,0), (1,0,0), (0,1,0)]
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
+        assert none_with(run_validators(stage, "usdRosValidators:CollisionGeometryAuthoring"), COLLISION_GEOMETRY_AUTHORING)
 
 
 # ------------------------------------------------------------------ #
@@ -336,7 +336,7 @@ def PhysicsFixedJoint "fixed" (
     prepend apiSchemas = ["MimicJointAPI"]
 ) {}
 """)
-        assert has(run_validators(stage, "rep0158:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
+        assert has(run_validators(stage, "usdRosValidators:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
 
     def test_mimic_on_revolute_no_violation(self):
         stage = make_stage("""
@@ -353,7 +353,7 @@ def PhysicsRevoluteJoint "finger" (
     rel mimic:joint = </source>
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
+        assert none_with(run_validators(stage, "usdRosValidators:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
 
     def test_mimic_on_prismatic_no_violation(self):
         stage = make_stage("""
@@ -370,7 +370,7 @@ def PhysicsPrismaticJoint "slide" (
     rel mimic:joint = </source>
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
+        assert none_with(run_validators(stage, "usdRosValidators:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
 
     def test_mimic_missing_relationship_gives_error(self):
         stage = make_stage("""
@@ -386,7 +386,7 @@ def PhysicsRevoluteJoint "follower" (
     float physics:upperLimit = 1.0
 }
 """)
-        assert has(run_validators(stage, "rep0158:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
+        assert has(run_validators(stage, "usdRosValidators:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
 
     def test_mimic_cycle_gives_error(self):
         stage = make_stage("""
@@ -406,7 +406,7 @@ def PhysicsRevoluteJoint "joint_b" (
     rel mimic:joint = </joint_a>
 }
 """)
-        assert has(run_validators(stage, "rep0158:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
+        assert has(run_validators(stage, "usdRosValidators:MimicJoint"), MIMIC_JOINT_CONSTRAINT)
 
     def test_mimic_joint_api_deprecated_gives_warning(self):
         """Any use of MimicJointAPI must produce a 1.3.9 deprecation warning."""
@@ -424,7 +424,7 @@ def PhysicsRevoluteJoint "follower" (
     rel mimic:joint = </source>
 }
 """)
-        assert has(run_validators(stage, "rep0158:MimicJoint"), MIMIC_JOINT_DEPRECATED)
+        assert has(run_validators(stage, "usdRosValidators:MimicJoint"), MIMIC_JOINT_DEPRECATED)
 
 
 # ------------------------------------------------------------------ #
@@ -441,7 +441,7 @@ def Xform "Robot" (
     instanceable = true
 ) {}
 """)
-        assert has(run_validators(stage, "rep0158:InstanceablePhysics"), INSTANCEABLE_PHYSICS)
+        assert has(run_validators(stage, "usdRosValidators:InstanceablePhysics"), INSTANCEABLE_PHYSICS)
 
     def test_ros_topic_prim_instanceable_gives_error(self):
         stage = make_stage("""
@@ -451,7 +451,7 @@ def Xform "Interface" (
     instanceable = true
 ) {}
 """)
-        assert has(run_validators(stage, "rep0158:InstanceablePhysics"), INSTANCEABLE_PHYSICS)
+        assert has(run_validators(stage, "usdRosValidators:InstanceablePhysics"), INSTANCEABLE_PHYSICS)
 
     def test_joint_prim_instanceable_gives_error(self):
         stage = make_stage("""
@@ -463,7 +463,7 @@ def PhysicsRevoluteJoint "arm_joint" (
     float physics:upperLimit = 1.0
 }
 """)
-        assert has(run_validators(stage, "rep0158:InstanceablePhysics"), INSTANCEABLE_PHYSICS)
+        assert has(run_validators(stage, "usdRosValidators:InstanceablePhysics"), INSTANCEABLE_PHYSICS)
 
     def test_visual_mesh_instanceable_no_violation(self):
         """Pure visual geometry with instanceable=true is permitted (§3.5)."""
@@ -477,4 +477,4 @@ def Mesh "BoltMesh" (
     point3f[] points = [(0,0,0), (1,0,0), (0,1,0)]
 }
 """)
-        assert none_with(run_validators(stage, "rep0158:InstanceablePhysics"), INSTANCEABLE_PHYSICS)
+        assert none_with(run_validators(stage, "usdRosValidators:InstanceablePhysics"), INSTANCEABLE_PHYSICS)

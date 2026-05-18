@@ -65,6 +65,156 @@
             "ResourcePath": "../resources",
             "Root": ".",
             "Type": "resource"
+        },
+        {
+            "Info": {
+                "Validators": {
+                    "CoordinateSystem": {
+                        "doc": "REP §1.1: units, axis conventions, and kinematic transform constraints.",
+                        "keywords": ["rep0158:1.1"]
+                    },
+                    "AssetManagement": {
+                        "doc": "REP §1.2.5: defaultPrim and assetInfo requirements.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "PathConvention": {
+                        "doc": "REP §1.2.5: internal references must use relative paths; no proprietary schemes.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "CompositionModel": {
+                        "doc": "REP §1.2.2: kind hierarchy - component must not contain component.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "VariantDefault": {
+                        "doc": "REP §1.2.4: every VariantSet must author a default variant selection.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "InheritsSpecializes": {
+                        "doc": "REP §1.2.3: flag Inherits/Specializes arcs for manual verification.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "PayloadKinematicTopology": {
+                        "doc": "REP §1.2.3: payloads must not gate kinematic/ROS topology prims.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "LayerEncoding": {
+                        "doc": "REP §1.2.1: schema/relationship-bearing layers must use .usda; heavy-data layers must use .usdc.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "ParallelSimulationInstancing": {
+                        "doc": "REP §1.2.6: point instancing must not replicate physics-enabled assets.",
+                        "keywords": ["rep0158:1.2"]
+                    },
+                    "JointLimits": {
+                        "doc": "REP §1.3: Non-continuous joints must author explicit limit attributes.",
+                        "keywords": ["rep0158:1.3"],
+                        "schemaTypes": ["UsdPhysicsRevoluteJoint", "UsdPhysicsPrismaticJoint"]
+                    },
+                    "MassProperties": {
+                        "doc": "REP §1.3: Dynamic bodies must have mass > 0; no zero-mass hack.",
+                        "keywords": ["rep0158:1.3"],
+                        "schemaTypes": ["UsdPhysicsRigidBodyAPI"]
+                    },
+                    "CollisionMaterial": {
+                        "doc": "REP §1.3.4: Collision geometry must bind a physics material with friction/restitution.",
+                        "keywords": ["rep0158:1.3"],
+                        "schemaTypes": ["UsdPhysicsCollisionAPI"]
+                    },
+                    "CollisionGeometryAuthoring": {
+                        "doc": "REP §1.3.1: Collision geometry should use guide purpose and none approximation.",
+                        "keywords": ["rep0158:1.3"],
+                        "schemaTypes": ["UsdPhysicsCollisionAPI"]
+                    },
+                    "ArticulationRoot": {
+                        "doc": "REP §1.3: At most one ArticulationRootAPI per connected kinematic tree.",
+                        "keywords": ["rep0158:1.3"]
+                    },
+                    "MimicJoint": {
+                        "doc": "REP §1.3: MimicJointAPI is deprecated; assets must use ExtendedPhysicsMimicAPI.",
+                        "keywords": ["rep0158:1.3"]
+                    },
+                    "InstanceablePhysics": {
+                        "doc": "REP §1.2.6: instanceable=true must not be set on physics/ROS prims.",
+                        "keywords": ["rep0158:1.3"]
+                    },
+                    "RosContextPlacement": {
+                        "doc": "REP §2.1: RosContextAPI prims must reside outside payload arcs.",
+                        "keywords": ["rep0158:2.1"]
+                    },
+                    "RosInterfacePlacement": {
+                        "doc": "REP §2.2: Interface prims must reside outside payload arcs.",
+                        "keywords": ["rep0158:2.2"]
+                    },
+                    "RosInterfaceStructure": {
+                        "doc": "REP §2.2: interface prim structure for robot-wide and sensor interfaces.",
+                        "keywords": ["rep0158:2.2"]
+                    },
+                    "RosTopic": {
+                        "doc": "REP §2.4: Validate RosTopicAPI required attributes and QoS values.",
+                        "keywords": ["rep0158:2.4"],
+                        "schemaTypes": ["UsdRosTopicAPI"]
+                    },
+                    "RosService": {
+                        "doc": "REP §2.5: Validate RosServiceAPI required attributes.",
+                        "keywords": ["rep0158:2.5"],
+                        "schemaTypes": ["UsdRosServiceAPI"]
+                    },
+                    "RosAction": {
+                        "doc": "REP §2.6: Validate RosActionAPI required attributes.",
+                        "keywords": ["rep0158:2.6"],
+                        "schemaTypes": ["UsdRosActionAPI"]
+                    },
+                    "RosFrameAPI": {
+                        "doc": "REP §2.7: RosFrameAPI should not duplicate implicit TF.",
+                        "keywords": ["rep0158:2.7"],
+                        "schemaTypes": ["UsdRosFrameAPI"]
+                    },
+                    "RosFrameAttributes": {
+                        "doc": "REP §2.7: Validate RosFrameAPI attribute types and frame-id naming.",
+                        "keywords": ["rep0158:2.7"],
+                        "schemaTypes": ["UsdRosFrameAPI"]
+                    },
+                    "CameraOpticalFrame": {
+                        "doc": "REP §2.8: Camera ROS interfaces must live on an optical frame child.",
+                        "keywords": ["rep0158:2.8"]
+                    },
+                    "RosJointName": {
+                        "doc": "REP §2.10: All UsdPhysicsJoint prims should carry ros:joint:name.",
+                        "keywords": ["rep0158:2.10"],
+                        "schemaTypes": [
+                            "UsdPhysicsRevoluteJoint",
+                            "UsdPhysicsPrismaticJoint",
+                            "UsdPhysicsFixedJoint",
+                            "UsdPhysicsSphericalJoint",
+                            "UsdPhysicsDistanceJoint",
+                            "UsdPhysicsJoint"
+                        ]
+                    },
+                    "MaterialPortability": {
+                        "doc": "REP §3.1: Materials must use UsdPreviewSurface as the normative surface.",
+                        "keywords": ["rep0158:3.1", "rep0158:export"]
+                    },
+                    "TextureFormat": {
+                        "doc": "REP §3.1 / §3.2: Validate texture file formats; flag UDIM tiles and forbidden formats.",
+                        "keywords": ["rep0158:3.2", "rep0158:export"]
+                    },
+                    "GeometryConstraints": {
+                        "doc": "REP §3.4: Collision meshes must be triangulated; meshes must be rightHanded.",
+                        "keywords": ["rep0158:3.4", "rep0158:export"]
+                    },
+                    "TextureBaking": {
+                        "doc": "REP §3.3: Procedural texture graphs should be baked to image/primvar data.",
+                        "keywords": ["rep0158:3.3", "rep0158:export"]
+                    },
+                    "LightingPortability": {
+                        "doc": "REP §3.6: avoid complex area lights for interoperable assets.",
+                        "keywords": ["rep0158:3.6", "rep0158:export"]
+                    },
+                    "keywords": ["UsdRosValidators", "rep0158"]
+                }
+            },
+            "Name": "usdRosValidators",
+            "Type": "python"
         }
     ]
 }

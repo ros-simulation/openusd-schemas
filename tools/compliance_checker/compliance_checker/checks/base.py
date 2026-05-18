@@ -62,46 +62,22 @@ PrimValidatorFn = Callable[
 ]
 
 
-def register_prim_validator(
-    name: str,
-    fn: PrimValidatorFn,
-    *,
-    doc: str = "",
-    keywords: list[str] | None = None,
-    section: str = "",
-    schema_types: list[str] | None = None,
-) -> None:
-    kw = list(keywords or [])
-    if section:
-        kw.append(f"rep0158:{section}")
-    kw.append("rep0158")
-    metadata = UsdValidation.ValidatorMetadata(
-        name=f"rep0158:{name}",
-        doc=doc,
-        keywords=kw,
-        schemaTypes=schema_types or [],
-    )
-    _registry.RegisterPrimValidator(metadata, fn)
+def register_plugin_stage_validator(name: str, fn: StageValidatorFn) -> None:
+    """Bind a plugin-declared stage validator implementation.
+
+    Validator metadata (doc, keywords, schemaTypes) must already be
+    declared under the ``usdRosValidators`` entry in
+    ``core/ros/plugin/resource/plugInfo.json``.
+    """
+    _registry.RegisterPluginStageValidator(f"usdRosValidators:{name}", fn)
 
 
-def register_stage_validator(
-    name: str,
-    fn: StageValidatorFn,
-    *,
-    doc: str = "",
-    keywords: list[str] | None = None,
-    section: str = "",
-) -> None:
-    kw = list(keywords or [])
-    if section:
-        kw.append(f"rep0158:{section}")
-    kw.append("rep0158")
-    metadata = UsdValidation.ValidatorMetadata(
-        name=f"rep0158:{name}",
-        doc=doc,
-        keywords=kw,
-    )
-    _registry.RegisterStageValidator(metadata, fn)
+def register_plugin_prim_validator(name: str, fn: PrimValidatorFn) -> None:
+    """Bind a plugin-declared prim validator implementation.
+
+    See :func:`register_plugin_stage_validator` for the metadata contract.
+    """
+    _registry.RegisterPluginPrimValidator(f"usdRosValidators:{name}", fn)
 
 
 def get_validators_for_keywords(

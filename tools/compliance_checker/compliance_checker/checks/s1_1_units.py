@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pxr import Gf, Usd, UsdGeom, UsdPhysics
 
-from .base import ErrorType, TimeRange, _error, _prim_site, _stage_site, register_stage_validator
+from .base import ErrorType, TimeRange, _error, _prim_site, _stage_site, register_plugin_stage_validator
 from ._tokens import (
     KINEMATIC_NON_IDENTITY_SCALE,
     KINEMATIC_TRANSFORM_OPS,
@@ -126,8 +126,4 @@ def _validate_coordinate_system(stage: Usd.Stage, timeRange: TimeRange):
                 )
 
 
-register_stage_validator(
-    "CoordinateSystem", _validate_coordinate_system,
-    doc="REP §1.1: units, axis conventions, and kinematic transform constraints.",
-    section="1.1",
-)
+register_plugin_stage_validator("CoordinateSystem", _validate_coordinate_system)

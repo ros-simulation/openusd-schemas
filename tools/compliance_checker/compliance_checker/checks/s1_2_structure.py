@@ -10,7 +10,7 @@ from .base import (
     _error,
     _prim_site,
     _stage_site,
-    register_stage_validator,
+    register_plugin_stage_validator,
 )
 from ._tokens import (
     ABSOLUTE_OR_PROPRIETARY_PATH,
@@ -78,10 +78,7 @@ def _check_asset_management(stage: Usd.Stage, timeRange: TimeRange):
         )
 
 
-register_stage_validator(
-    "AssetManagement", _check_asset_management,
-    doc="REP §1.2.5: defaultPrim and assetInfo requirements.", section="1.2",
-)
+register_plugin_stage_validator("AssetManagement", _check_asset_management)
 
 
 def _check_path_convention(stage: Usd.Stage, timeRange: TimeRange):
@@ -126,11 +123,7 @@ def _check_path_convention(stage: Usd.Stage, timeRange: TimeRange):
                 )
 
 
-register_stage_validator(
-    "PathConvention", _check_path_convention,
-    doc="REP §1.2.5: internal references must use relative paths; no proprietary schemes.",
-    section="1.2",
-)
+register_plugin_stage_validator("PathConvention", _check_path_convention)
 
 
 def _check_composition_model(stage: Usd.Stage, timeRange: TimeRange):
@@ -150,10 +143,7 @@ def _check_composition_model(stage: Usd.Stage, timeRange: TimeRange):
                 )
 
 
-register_stage_validator(
-    "CompositionModel", _check_composition_model,
-    doc="REP §1.2.2: kind hierarchy – component must not contain component.", section="1.2",
-)
+register_plugin_stage_validator("CompositionModel", _check_composition_model)
 
 
 def _check_variant_default(stage: Usd.Stage, timeRange: TimeRange):
@@ -169,10 +159,7 @@ def _check_variant_default(stage: Usd.Stage, timeRange: TimeRange):
                 )
 
 
-register_stage_validator(
-    "VariantDefault", _check_variant_default,
-    doc="REP §1.2.4: every VariantSet must author a default variant selection.", section="1.2",
-)
+register_plugin_stage_validator("VariantDefault", _check_variant_default)
 
 
 def _check_inherits_specializes(stage: Usd.Stage, timeRange: TimeRange):
@@ -204,10 +191,7 @@ def _check_inherits_specializes(stage: Usd.Stage, timeRange: TimeRange):
                 )
 
 
-register_stage_validator(
-    "InheritsSpecializes", _check_inherits_specializes,
-    doc="REP §1.2.3: flag Inherits/Specializes arcs for manual verification.", section="1.2",
-)
+register_plugin_stage_validator("InheritsSpecializes", _check_inherits_specializes)
 
 
 def _check_payload_kinematic_topology(stage: Usd.Stage, timeRange: TimeRange):
@@ -231,10 +215,7 @@ def _check_payload_kinematic_topology(stage: Usd.Stage, timeRange: TimeRange):
             )
 
 
-register_stage_validator(
-    "PayloadKinematicTopology", _check_payload_kinematic_topology,
-    doc="REP §1.2.3: payloads must not gate kinematic/ROS topology prims.", section="1.2",
-)
+register_plugin_stage_validator("PayloadKinematicTopology", _check_payload_kinematic_topology)
 
 
 def _layer_has_api_schemas(prim_spec: Sdf.PrimSpec) -> bool:
@@ -283,11 +264,7 @@ def _check_layer_encoding(stage: Usd.Stage, timeRange: TimeRange):
             )
 
 
-register_stage_validator(
-    "LayerEncoding", _check_layer_encoding,
-    doc="REP §1.2.1: schema/relationship-bearing layers must use .usda; heavy-data layers must use .usdc.",
-    section="1.2",
-)
+register_plugin_stage_validator("LayerEncoding", _check_layer_encoding)
 
 
 def _contains_forbidden_semantics(root: Usd.Prim) -> bool:
@@ -323,8 +300,4 @@ def _check_parallel_simulation_instancing(stage: Usd.Stage, timeRange: TimeRange
                 )
 
 
-register_stage_validator(
-    "ParallelSimulationInstancing", _check_parallel_simulation_instancing,
-    doc="REP §1.2.6: point instancing must not replicate physics-enabled assets.",
-    section="1.2",
-)
+register_plugin_stage_validator("ParallelSimulationInstancing", _check_parallel_simulation_instancing)
