@@ -9,7 +9,7 @@ Interoperable OpenUSD ROS core and extension schemas supplemented by conversion 
 Validates OpenUSD assets against the REP-0158 interoperability standard.
 Ships in two interchangeable forms backed by the same `plugInfo.json`:
 
-- **`usd-check`** — pure-Python CLI installable from PyPI; no OpenUSD build
+- **`ros-usd-check`** — pure-Python CLI installable from PyPI; no OpenUSD build
   required.
 - **`usdRosValidators`** — USD plugin discoverable by stock `usdchecker`
   on a full OpenUSD install (≥ v26.05).

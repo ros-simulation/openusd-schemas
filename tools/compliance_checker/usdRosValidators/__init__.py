@@ -6,7 +6,7 @@ then imports each check module to bind validator implementations to the
 metadata via ``RegisterPluginPrimValidator`` / ``RegisterPluginStageValidator``.
 
 USD imports this module on first registry hit for any ``usdRosValidators:*``
-validator; running it directly from Python (e.g. via ``usd-check``) has the
+validator; running it directly from Python (e.g. via ``ros-usd-check``) has the
 same effect.
 """
 

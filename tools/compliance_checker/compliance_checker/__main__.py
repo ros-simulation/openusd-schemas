@@ -1,4 +1,4 @@
-"""CLI entry point: ``python -m compliance_checker`` or ``usd-check``."""
+"""CLI entry point: ``python -m compliance_checker`` or ``ros-usd-check``."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ _SEVERITY_ICON = {
 _SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 
 
-@click.command(name="usd-check")
+@click.command(name="ros-usd-check")
 @click.argument("asset", type=click.Path(exists=True, readable=True))
 @click.option(
     "--export",

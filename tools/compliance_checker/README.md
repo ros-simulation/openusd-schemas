@@ -9,7 +9,7 @@ simulation, ROS integration, and export portability.
 The checker ships its validators in two interchangeable forms that share
 the same `plugInfo.json` and the same implementation modules:
 
-- **`usd-check`** — a pure-Python CLI installable from PyPI. Works in any
+- **`ros-usd-check`** — a pure-Python CLI installable from PyPI. Works in any
   Python 3.12+ environment with no OpenUSD build required (`usd-core` brings
   the `UsdValidation` framework along on pip). Suited to quick local checks
   and lightweight CI workers.
@@ -22,7 +22,7 @@ the same `plugInfo.json` and the same implementation modules:
 > Run the checker on any asset without cloning\*:
 >
 > ```bash
-> uvx --from ros-openusd-compliance-checker usd-check <asset.usd>
+> uvx --from ros-openusd-compliance-checker ros-usd-check <asset.usd>
 > ```
 >
 > \* uv must be installed first:
@@ -40,7 +40,7 @@ pip install ros-openusd-compliance-checker
 ## Usage
 
 ```bash
-usd-check [OPTIONS] ASSET
+ros-usd-check [OPTIONS] ASSET
 ```
 
 By default only the **core** checks run (REP §1 and §2: units, structure,
@@ -54,10 +54,10 @@ physics, and the five base ROS schemas — `RosContextAPI`, `RosTopicAPI`,
 
 ```bash
 # Core checks only (default)
-usd-check robot.usda
+ros-usd-check robot.usda
 
 # Core + export checks
-usd-check robot.usda --export
+ros-usd-check robot.usda --export
 ```
 
 ## Running through USD CLI tools (`usdchecker`, `usdview`)

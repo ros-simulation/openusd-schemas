@@ -1,6 +1,6 @@
 [project]
 name = "ros-openusd-compliance-checker"
-version = "0.1.1"
+version = "0.2.0"
 description = "Package for validating OpenUSD assets against the REP-0158 interoperability standard."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -24,7 +24,7 @@ usdRosValidators = ["plugInfo.json", "generatedSchema.usda"]
 package = true
 
 [project.scripts]
-usd-check = "compliance_checker.__main__:main"
+ros-usd-check = "compliance_checker.__main__:main"
 
 [tool.pytest.ini_options]
 addopts = """
