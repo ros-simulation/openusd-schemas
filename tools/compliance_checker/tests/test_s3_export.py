@@ -55,6 +55,41 @@ def Material "Mat" {
 """)
         assert none_with(run_validators(stage, "usdRosValidators:MaterialPortability"), MISSING_PREVIEW_SURFACE)
 
+    def test_physics_material_without_shader_no_violation(self):
+        """A shaderless Material carrying UsdPhysicsMaterialAPI (REP §1.3.4)
+        is a physics material, not a render material — exempt from §3.1."""
+        stage = make_stage("""
+#usda 1.0
+def Material "PhysMat" (
+    prepend apiSchemas = ["PhysicsMaterialAPI"]
+)
+{
+    float physics:staticFriction = 1.0
+    float physics:dynamicFriction = 1.0
+    float physics:restitution = 0.0
+}
+""")
+        assert none_with(run_validators(stage, "usdRosValidators:MaterialPortability"), MISSING_PREVIEW_SURFACE)
+
+    def test_physics_material_with_broken_surface_still_warns(self):
+        """A material that authors a surface connection is a render material
+        even if it also carries PhysicsMaterialAPI — broken wiring still warns."""
+        stage = make_stage("""
+#usda 1.0
+def Material "DualMat" (
+    prepend apiSchemas = ["PhysicsMaterialAPI"]
+)
+{
+    token outputs:surface.connect = </DualMat/MDLSurf.outputs:out>
+
+    def Shader "MDLSurf" {
+        uniform token info:id = "mdlMaterial"
+        token outputs:out
+    }
+}
+""")
+        assert has(run_validators(stage, "usdRosValidators:MaterialPortability"), MISSING_PREVIEW_SURFACE)
+
     def test_material_with_mdl_shader_only_gives_warning(self):
         """Proprietary shader on the universal terminal without UsdPreviewSurface."""
         stage = make_stage("""

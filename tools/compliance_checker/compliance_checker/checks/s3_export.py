@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 
-from pxr import Usd, UsdGeom, UsdShade
+from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
 from .base import ErrorType, TimeRange, _error, _prim_site, register_plugin_stage_validator
 from ._tokens import (
@@ -58,6 +58,13 @@ def _validate_material_portability(stage: Usd.Stage, timeRange: TimeRange):
             continue
         mat = UsdShade.Material(prim)
         if not mat:
+            continue
+        # Physics materials (REP 1.3.4) are shaderless.
+        # UsdPhysicsMaterialAPI with no surface is not a render material
+        # and therefore exempted from the 3.1 check
+        surface = mat.GetSurfaceOutput()
+        if prim.HasAPI(UsdPhysics.MaterialAPI) and (
+                not surface or not surface.HasConnectedSource()):
             continue
         pp = str(prim.GetPath())
         if not mat.GetSurfaceOutput():
