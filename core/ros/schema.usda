@@ -2,7 +2,7 @@
 (
     "ROS Integration Schemas for OpenUSD Simulation Asset Interoperability."
     " Defines declarative, engine-agnostic API schemas for ROS interfaces"
-    " as specified in REP-XXXX, Section 2."
+    " as specified in REP-0158:2026, Section 2."
     subLayers = [
         @usd/schema.usda@
     ]
@@ -10,9 +10,10 @@
 
 over "GLOBAL" (
     customData = {
-        string libraryName       = "usdRos"
-        string libraryPath       = "usdRos"
-        string libraryPrefix     = "UsdRos"
+        string libraryName        = "usdRos"
+        string libraryPath        = "usdRos"
+        string libraryPrefix      = "UsdRos"
+        string skipCodeGeneration = true
         dictionary libraryTokens = {
             # --- Role tokens (shared by Topic, Service, Action) ---
             dictionary publisher = {
@@ -360,6 +361,7 @@ class "RosFrameAPI" (
     customData = {
         token apiSchemaType = "singleApply"
         string className = "FrameAPI"
+        token[] apiSchemaCanOnlyApplyTo = ["Xform"]
     }
     doc = """Explicit TF frame broadcasting for non-physical dummy frames.
 
