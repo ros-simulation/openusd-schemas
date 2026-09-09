@@ -13,7 +13,7 @@ over "GLOBAL" (
         string libraryName        = "usdRos"
         string libraryPath        = "usdRos"
         string libraryPrefix      = "UsdRos"
-        string skipCodeGeneration = true
+        bool skipCodeGeneration = true
         dictionary libraryTokens = {
             # --- Role tokens (shared by Topic, Service, Action) ---
             dictionary publisher = {
